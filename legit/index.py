@@ -36,6 +36,9 @@ class Index:
         self.changed: bool = False
         self.parents: dict[Path, set[Path]] = defaultdict(set)
 
+    def is_tracked(self, path: Path) -> bool:
+        return path in self.entries
+
     def release_lock(self) -> None:
         self.lockfile.rollback()
 

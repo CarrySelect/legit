@@ -9,6 +9,8 @@ from legit.cmd_base import Base
 from legit.cmd_init import Init
 from legit.cmd_add import Add
 from legit.cmd_commit import Commit
+from legit.cmd_status import Status
+
 
 class Command:
     class Unknown(Exception):
@@ -18,6 +20,7 @@ class Command:
         "init": Init,
         "add": Add,
         "commit": Commit,
+        "status": Status,
     }
 
     @staticmethod

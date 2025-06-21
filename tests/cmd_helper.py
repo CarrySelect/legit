@@ -33,6 +33,27 @@ def repo(repo_path):
     return Repository(git_dir)
 
 @pytest.fixture
+def commit(legit_cmd):
+    """
+    A factory fixture that returns a helper function to run the commit command.
+
+    The returned function takes one argument: the commit message.
+    It automatically handles setting the author environment and stdin.
+    """
+    def _commit_cmd(message: str):
+        # 1. Sets the environment variables for the author
+        author_env = {
+            "GIT_AUTHOR_NAME": "A. U. Thor",
+            "GIT_AUTHOR_EMAIL": "author@example.com",
+        }
+
+        # 2. Sets stdin with the message and executes legit_cmd("commit")
+        #    It returns the result of the legit_cmd call directly.
+        return legit_cmd("commit", env=author_env, stdin_data=message)
+
+    return _commit_cmd
+
+@pytest.fixture
 def write_file(repo_path):
     """
     Write `contents` to `repo_path/name`, creating parent dirs as needed.
@@ -43,6 +64,7 @@ def write_file(repo_path):
         with open(path, 'w') as f:
             f.write(contents)
     return _write_file
+
 
 @pytest.fixture
 def make_executable(repo_path):
@@ -69,11 +91,11 @@ def legit_cmd(repo_path):
     """
     Run the command with StringIO streams and return (cmd, stdin, stdout, stderr).
     """
-    def _legit_cmd(*argv):
-        stdin = StringIO()
+    def _legit_cmd(*argv, env={}, stdin_data=""):
+        stdin = StringIO(stdin_data)
         stdout = StringIO()
         stderr = StringIO()
-        cmd = Command.execute(repo_path, {}, [""] + list(argv), stdin, stdout, stderr)
+        cmd = Command.execute(repo_path, env, [""] + list(argv), stdin, stdout, stderr)
         return cmd, stdin, stdout, stderr
     return _legit_cmd
 

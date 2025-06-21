@@ -37,7 +37,7 @@ class Commit(Base):
         name: str = os.environ["GIT_AUTHOR_NAME"]
         email: str = os.environ["GIT_AUTHOR_EMAIL"]
         author: Author = Author(name, email, datetime.now().astimezone())
-        message: str = sys.stdin.read()
+        message: str = self.stdin.read()
     
         assert root.oid is not None
         commit = CommitObject(parent, root.oid, author, message)
