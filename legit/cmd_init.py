@@ -22,8 +22,6 @@ class Init(Base):
             
         git_path: Path = root_path / ".git"
 
-        print(f"{git_path=}")
-
         for d in ("objects", "refs"):
             try:
                 (git_path / d).mkdir(parents=True, exist_ok=True)

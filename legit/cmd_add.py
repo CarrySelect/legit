@@ -17,7 +17,6 @@ class Add(Base):
             self.repo.index.load_for_update()
 
             for path in self.expanded_paths():
-                print(path)
                 self.add_to_index(path)
     
             self.repo.index.write_updates()
