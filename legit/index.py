@@ -14,6 +14,11 @@ class Hash(Protocol):
     def update(self, data: bytes) -> None: ...
     def digest(self) -> bytes: ...
 
+
+def _u32(x: int) -> int:
+    """Return the lower 32 bits of x (Git index uses uint32)."""
+    return x & 0xFFFFFFFF
+
 class Index:
     HEADER_SIZE: int = 12
     HEADER_FORMAT: str = ">4sII"
@@ -259,8 +264,8 @@ class Entry:
         flags = min(len(str(path).encode('utf-8')), Entry.MAX_PATH_SIZE)
 
         return cls(
-            _stat.st_ctime, 0,
-            _stat.st_mtime, 0,
+            _stat.st_ctime, _stat.st_ctime_ns,
+            _stat.st_mtime, _stat.st_mtime_ns,
             _stat.st_dev, _stat.st_ino,
             mode, _stat.st_uid, _stat.st_gid, _stat.st_size,
             oid, flags, path
@@ -271,10 +276,11 @@ class Entry:
 
         header = struct.pack(
             "!10I",
-            int(self.ctime), self.ctime_nsec,
-            int(self.mtime), self.mtime_nsec,
-            self.dev, self.ino,
-            self._mode, self.uid, self.gid, self.size
+            _u32(int(self.ctime)),      _u32(self.ctime_nsec),
+            _u32(int(self.mtime)),      _u32(self.mtime_nsec),
+            _u32(self.dev),             _u32(self.ino),
+            _u32(self._mode),           _u32(self.uid),
+            _u32(self.gid),             _u32(self.size),
         )
 
         # 20 raw bytes from 40-char hex OID
