@@ -29,7 +29,11 @@ class Commit(Base):
         root = Tree.from_entries(repo.index.entries)
         root.traverse(lambda tree: repo.database.store(tree))
 
-        parent: str = repo.refs.read_head()
+        try:
+            parent: str | None = repo.refs.read_head()
+        except FileNotFoundError:
+            parent = None
+
         name: str = os.environ["GIT_AUTHOR_NAME"]
         email: str = os.environ["GIT_AUTHOR_EMAIL"]
         author: Author = Author(name, email, datetime.now().astimezone())
