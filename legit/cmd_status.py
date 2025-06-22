@@ -3,6 +3,7 @@ import stat
 from typing import Any, TextIO, MutableMapping
 from pathlib import Path
 
+from legit.blob import Blob
 from legit.cmd_base import Base
 from legit.index import Entry
 from legit.repository import Repository
@@ -57,6 +58,14 @@ class Status(Base):
     def check_index_entry(self, entry: Entry) -> None:
         stat = self.stats[entry.path]
         if not entry.stat_match(stat):
+            self.changed.add(str(entry.path))
+            return
+        
+        data = self.repo.workspace.read_file(entry.path)
+        blob = Blob(data)
+        oid = self.repo.database.hash_object(blob)
+
+        if entry.oid != oid:
             self.changed.add(str(entry.path))
 
     def _is_trackable_file(self, path: Path, stat: os.stat_result) -> bool:

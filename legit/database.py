@@ -14,14 +14,23 @@ class Database:
         self.path: Path = path
 
     def store(self, obj: Blob | Commit | Tree) -> None:
+        content = self.serialize_object(obj)
+        obj.oid = self.hash_content(content)
+        
+        self.write_object(obj.oid, content)
+
+    def hash_object(self, obj: Blob | Commit | Tree) -> str:
+        return self.hash_content(self.serialize_object(obj))
+
+    def serialize_object(self, obj: Blob | Commit | Tree) -> bytes:
         string = obj.to_bytes()
         header = f"{obj.type()} {len(string)}".encode('utf-8') + b"\x00"
 
-        content = header + string
+        return header + string
 
-        obj.oid = hashlib.sha1(content).hexdigest()
-        self.write_object(obj.oid, content)
-
+    def hash_content(self, content: bytes) -> str:
+        return hashlib.sha1(content).hexdigest()
+ 
     def write_object(self, oid: str, content: bytes) -> None:
         object_path = self.path / str(oid[:2]) / str(oid[2:])
         if object_path.exists():
