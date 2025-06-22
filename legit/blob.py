@@ -4,8 +4,8 @@ class Blob:
         self._oid: str | None = None
     
     @classmethod
-    def parse(cls, data: str) -> 'Blob':
-        return cls(data)
+    def parse(cls, data: bytes) -> 'Blob':
+        return cls(data.decode('utf-8'))
 
     @property
     def oid(self) -> str:

@@ -21,7 +21,7 @@ class Database:
         self.path: Path = path
         self.objects: MutableMapping[str, Blob | Commit | Tree] = {}
 
-    def load(self, oid: str) -> None:
+    def load(self, oid: str) -> Blob | Commit | Tree:
         obj = self.read_object(oid)
         self.objects[oid] = obj
         return obj

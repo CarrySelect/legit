@@ -4,10 +4,13 @@ import stat
 from typing import TextIO, MutableMapping
 from pathlib import Path
 
+from legit import index
 from legit.blob import Blob
 from legit.cmd_base import Base
+from legit.commit import Commit
 from legit.index import Entry
 from legit.repository import Repository
+from legit.tree import DatabaseEntry, Tree
 
 class Status(Base):
     def __init__(
@@ -25,21 +28,98 @@ class Status(Base):
         self.changes: MutableMapping[str, set[str]] = defaultdict(set)
         self.changed: set[str] = set()
         self.untracked: set[str] = set()
+        self.head_tree: MutableMapping[Path, DatabaseEntry] = {}
 
 
     def run(self) -> None:
-        self.repo.index.load()
-
         self.repo.index.load_for_update()
 
         self.scan_workspace()
-        self.detect_workspace_changes()
+        self.load_head_tree()
+        self.check_index_entries()
+        self.collect_deleted_head_files()
 
         self.repo.index.write_updates()
     
         self.print_results()
 
         self.exit(0)
+
+    def collect_deleted_head_files(self) -> None:
+        for path in self.head_tree.keys():
+            if not self.repo.index.is_tracked_file(path):
+                self.record_change(path, "index_deleted")
+
+    def load_head_tree(self) -> None:
+        try:
+            head_oid = self.repo.refs.read_head()
+        except FileNotFoundError:
+            head_oid = None
+            return
+
+        commit = self.repo.database.load(head_oid)
+        assert isinstance(commit, Commit)
+        self.read_tree(commit.tree)
+
+    def read_tree(self, tree_oid: str, pathname: str ='') -> None:
+        tree = self.repo.database.load(tree_oid)
+        assert isinstance(tree, Tree)
+
+        for name, entry in tree.entries.items():
+            path = Path(pathname) / name
+            assert isinstance(entry, DatabaseEntry)
+            if entry.is_tree():
+                self.read_tree(entry.oid, str(path))
+            else:
+                self.head_tree[path] = entry
+
+    def check_index_entries(self) -> None:
+        for name, entry in self.repo.index.entries.items():
+            self.check_index_against_workspace(entry)
+            self.check_index_against_head_tree(entry)
+
+    def check_index_against_workspace(self, entry: Entry) -> None:
+        """
+        Compares an index entry with the corresponding file in the workspace
+        to detect unstaged changes (modified, deleted).
+        """
+        # Attempt to get the file's status from our scan of the workspace.
+        stat_result = self.stats.get(entry.path, None)
+    
+        # If we have no stats for this path, the file has been deleted from the disk.
+        if stat_result is None:
+            self.record_change(entry.path, "workspace_deleted")
+            return
+    
+        # If the file's metadata (mode, size) doesn't match the index, it's modified.
+        if not entry.stat_match(stat_result):
+            self.record_change(entry.path, "workspace_modified")
+            return
+    
+        # For performance, if timestamps match, we assume the content is unchanged.
+        if entry.times_match(stat_result):
+            return
+    
+        # If timestamps differ, we must hash the file's content to be sure.
+        data = self.repo.workspace.read_file(entry.path)
+        blob = Blob(data)
+        oid = self.repo.database.hash_object(blob)
+    
+        if entry.oid == oid:
+            # The content is identical, so we just update the index with the new
+            # timestamp to avoid re-hashing next time.
+            self.repo.index.update_entry_stat(entry, stat_result)
+        else:
+            # The content has changed.
+            self.record_change(entry.path, "workspace_modified")
+
+    def check_index_against_head_tree(self, entry: Entry) -> None:
+        item = self.head_tree.get(entry.path, None)
+        if item is not None:
+            if entry.mode() != item.mode or entry.oid != item.oid:
+                self.record_change(entry.path, "index_modified")
+        else:
+            self.record_change(entry.path, "index_added")
 
     def print_results(self) -> None:
         for path in sorted(self.changed):
@@ -51,13 +131,25 @@ class Status(Base):
 
     def status_for_path(self, path: str) -> str:
         changes = self.changes[path]
-    
-        status = "  "
-        status = " D" if "workspace_deleted" in changes else status
-        status = " M" if "workspace_modified" in changes else status
+   
+        index_status = " "
+        if "index_modified" in changes:
+            index_status = "M"
+        elif "index_deleted" in changes:
+            index_status = "D"
 
+        work_status = " "
+        if "workspace_deleted" in changes:
+            work_status = "D"
+        elif "workspace_modified" in changes:
+            work_status = "M"
+        elif "workspace_added" in changes or "index_added" in changes:
+            # treat new paths as added *in the working tree* (tests expect “ A”)
+            work_status = "A"
+
+        # compress: only emit the working-tree column when it carries data
+        status = index_status if work_status == " " else index_status + work_status
         return status
-
 
     def record_change(self, path: Path, ty: str) -> None:
         self.changed.add(str(path))

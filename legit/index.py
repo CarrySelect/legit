@@ -40,8 +40,11 @@ class Index:
         entry.update_stat(stat)
         self.changed = True
 
+    def is_tracked_file(self, path: Path) -> bool:
+        return path in self.entries
+
     def is_tracked(self, path: Path) -> bool:
-        return path in self.entries or path in self.parents
+        return self.is_tracked_file(path) or path in self.parents
 
     def release_lock(self) -> None:
         self.lockfile.rollback()

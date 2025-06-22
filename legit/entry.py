@@ -19,3 +19,6 @@ class Entry:
 
     def parent_directories(self) -> list[Path]:
         return [p for p in self.name.parents[::-1] if p.name != '.']
+
+    def is_tree(self) -> bool:
+        return self.name.is_dir()
