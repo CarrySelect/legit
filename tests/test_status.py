@@ -16,6 +16,7 @@ from tests.cmd_helper import (
     commit,
     legit_cmd,
     mkdir,
+    touch,
     committed_repo,
 )
 
@@ -123,3 +124,7 @@ class TestIndexWorkspaceChanges:
     def test_reports_modified_files_with_unchanged_size(self, write_file, legit_cmd):
         write_file("a/b/3.txt", "hello")
         assert_status(legit_cmd, " M a/b/3.txt\n")
+
+    def test_prints_nothing_when_file_is_touched(self, touch, legit_cmd):
+        touch("1.txt")
+        assert_status(legit_cmd, "")

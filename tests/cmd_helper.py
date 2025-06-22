@@ -76,6 +76,15 @@ def mkdir(repo_path):
         path.mkdir(parents=True, exist_ok=True)
     return _mkdir
 
+@pytest.fixture
+def touch(repo_path):
+    """
+    Touch a file in `repo_path`.
+    """
+    def _touch(name: str):
+        path = repo_path / name
+        path.touch()
+    return _touch
 
 @pytest.fixture
 def make_executable(repo_path):

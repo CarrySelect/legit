@@ -27,8 +27,12 @@ class Status(Base):
     def run(self) -> None:
         self.repo.index.load()
 
+        self.repo.index.load_for_update()
+
         self.scan_workspace()
         self.detect_workspace_changes()
+
+        self.repo.index.write_updates()
 
         for f in sorted(self.changed):
             self.stdout.write(f" M {f}\n")
@@ -61,11 +65,16 @@ class Status(Base):
             self.changed.add(str(entry.path))
             return
         
+        if entry.times_match(stat):
+            return
+        
         data = self.repo.workspace.read_file(entry.path)
         blob = Blob(data)
         oid = self.repo.database.hash_object(blob)
 
-        if entry.oid != oid:
+        if entry.oid == oid:
+            self.repo.index.update_entry_stat(entry, stat)
+        else:
             self.changed.add(str(entry.path))
 
     def _is_trackable_file(self, path: Path, stat: os.stat_result) -> bool:

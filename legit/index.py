@@ -36,6 +36,10 @@ class Index:
         self.changed: bool = False
         self.parents: dict[Path, set[Path]] = defaultdict(set)
 
+    def update_entry_stat(self, entry: 'Entry', stat: os.stat_result) -> None:
+        entry.update_stat(stat)
+        self.changed = True
+
     def is_tracked(self, path: Path) -> bool:
         return path in self.entries or path in self.parents
 
@@ -208,6 +212,18 @@ class Entry:
         self.flags = flags
         self.path = path
 
+    def update_stat(self, stat_result: os.stat_result) -> None:
+        self.ctime = int(stat_result.st_ctime)
+        self.ctime_nsec = stat_result.st_ctime_ns
+        self.mtime = int(stat_result.st_mtime)
+        self.mtime_nsec = stat_result.st_mtime_ns
+        self.dev = stat_result.st_dev
+        self.ino = stat_result.st_ino
+        self._mode = Entry.mode_for_stat(stat_result)
+        self.uid = stat_result.st_uid
+        self.gid = stat_result.st_gid
+        self.size = stat_result.st_size
+
     @staticmethod
     def mode_for_stat(stat_result: os.stat_result) -> int:
         exec_perms: int = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
@@ -216,6 +232,12 @@ class Entry:
 
     def stat_match(self, stat_result: os.stat_result) -> bool:
         return self._mode == Entry.mode_for_stat(stat_result) and (self.size == 0 or self.size == stat_result.st_size)
+    
+    def times_match(self, stat_result: os.stat_result) -> bool:
+        return self.ctime == int(stat_result.st_ctime) and \
+               self.ctime_nsec == stat_result.st_ctime_ns and \
+               self.mtime == int(stat_result.st_mtime) and \
+               self.mtime_nsec == stat_result.st_mtime_ns
 
     def mode(self) -> int:
         return self._mode
