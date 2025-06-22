@@ -208,8 +208,14 @@ class Entry:
         self.flags = flags
         self.path = path
 
-    def stat_match(self, stat: os.stat_result) -> bool:
-        return self.size == 0 or self.size == stat.st_size
+    @staticmethod
+    def mode_for_stat(stat_result: os.stat_result) -> int:
+        exec_perms: int = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        is_executable: bool = bool(stat_result.st_mode & exec_perms)
+        return Entry.REGULAR_MODE if not is_executable else Entry.EXECUTABLE_MODE
+
+    def stat_match(self, stat_result: os.stat_result) -> bool:
+        return self._mode == Entry.mode_for_stat(stat_result) and (self.size == 0 or self.size == stat_result.st_size)
 
     def mode(self) -> int:
         return self._mode

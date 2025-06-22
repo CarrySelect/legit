@@ -116,3 +116,6 @@ class TestIndexWorkspaceChanges:
         write_file("a/2.txt", "modified")
         assert_status(legit_cmd, " M 1.txt\n M a/2.txt\n")
 
+    def test_reports_changed_mode(self, make_executable, legit_cmd):
+        make_executable("a/2.txt")
+        assert_status(legit_cmd, " M a/2.txt\n")
