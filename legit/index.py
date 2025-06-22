@@ -37,7 +37,7 @@ class Index:
         self.parents: dict[Path, set[Path]] = defaultdict(set)
 
     def is_tracked(self, path: Path) -> bool:
-        return path in self.entries
+        return path in self.entries or path in self.parents
 
     def release_lock(self) -> None:
         self.lockfile.rollback()
@@ -207,6 +207,9 @@ class Entry:
         self.oid = oid
         self.flags = flags
         self.path = path
+
+    def stat_match(self, stat: os.stat_result) -> bool:
+        return self.size == 0 or self.size == stat.st_size
 
     def mode(self) -> int:
         return self._mode

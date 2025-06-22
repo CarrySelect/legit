@@ -67,6 +67,17 @@ def write_file(repo_path):
 
 
 @pytest.fixture
+def mkdir(repo_path):
+    """
+    Make a directory in `repo_path`.
+    """
+    def _mkdir(name: str):
+        path = repo_path / name
+        path.mkdir(parents=True, exist_ok=True)
+    return _mkdir
+
+
+@pytest.fixture
 def make_executable(repo_path):
     """
     Make the file at `repo_path/name` executable (0755).
@@ -113,3 +124,10 @@ def assert_stderr(stderr, expected):
     data = stderr.read()
     assert data == expected, f"Expected stderr {expected!r}, got {data!r}"
 
+@pytest.fixture
+def committed_repo(write_file, legit_cmd, commit):
+    write_file("1.txt", "one")
+    write_file("a/2.txt", "two")
+    write_file("a/b/3.txt", "three")
+    legit_cmd("add", ".")
+    commit("commit message")

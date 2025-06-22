@@ -1,4 +1,5 @@
 import os
+from typing import MutableMapping
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -23,6 +24,21 @@ class Workspace:
         else:
             raise Workspace.MissingFile(f"pathspec \"{path.relative_to(self.path)}\" did not match any files")
 
+    def list_dir(self, dirname: str) -> MutableMapping[Path, os.stat_result]:
+        stats = {}
+
+        path = self.path / dirname
+        
+        entries = []
+        for f in path.iterdir():
+            if f.name not in Workspace.IGNORE:
+                entries.append(f)
+
+        for entry in entries:
+            relative = (path / entry).relative_to(self.path)
+            stats[relative] = (path / entry).stat()
+
+        return stats
 
     def read_file(self, path: Path) -> str:
         try:
