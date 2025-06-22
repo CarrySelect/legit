@@ -16,6 +16,7 @@ from tests.cmd_helper import (
     commit,
     legit_cmd,
     mkdir,
+    delete,
     touch,
     committed_repo,
 )
@@ -128,3 +129,7 @@ class TestIndexWorkspaceChanges:
     def test_prints_nothing_when_file_is_touched(self, touch, legit_cmd):
         touch("1.txt")
         assert_status(legit_cmd, "")
+    
+    def test_reports_deleted_files(self, delete, legit_cmd):
+        delete("a/2.txt")
+        assert_status(legit_cmd, " D a/2.txt\n")

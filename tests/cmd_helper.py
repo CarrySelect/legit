@@ -87,6 +87,19 @@ def touch(repo_path):
     return _touch
 
 @pytest.fixture
+def delete(repo_path):
+    """
+    Delete a file in `repo_path`.
+    """
+    def _delete(name: str):
+        path = repo_path / name
+        if path.is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+        else:
+            path.unlink(missing_ok=True)
+    return _delete
+
+@pytest.fixture
 def make_executable(repo_path):
     """
     Make the file at `repo_path/name` executable (0755).

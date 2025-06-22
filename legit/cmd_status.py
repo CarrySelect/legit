@@ -1,6 +1,7 @@
+from collections import defaultdict
 import os
 import stat
-from typing import Any, TextIO, MutableMapping
+from typing import TextIO, MutableMapping
 from pathlib import Path
 
 from legit.blob import Blob
@@ -20,9 +21,11 @@ class Status(Base):
     ) -> None:
         super().__init__(_dir, env, args, stdin, stdout, stderr)
         self.repo: Repository = Repository(self.dir / ".git")
-        self.untracked: set[str] = set()
         self.stats: MutableMapping[Path, os.stat_result] = {}
+        self.changes: MutableMapping[str, set[str]] = defaultdict(set)
         self.changed: set[str] = set()
+        self.untracked: set[str] = set()
+
 
     def run(self) -> None:
         self.repo.index.load()
@@ -33,14 +36,32 @@ class Status(Base):
         self.detect_workspace_changes()
 
         self.repo.index.write_updates()
-
-        for f in sorted(self.changed):
-            self.stdout.write(f" M {f}\n")
-
-        for f in sorted(self.untracked):
-            self.stdout.write(f"?? {f}\n")
+    
+        self.print_results()
 
         self.exit(0)
+
+    def print_results(self) -> None:
+        for path in sorted(self.changed):
+            status = self.status_for_path(path)
+            self.stdout.write(f"{status} {path}\n")
+
+        for path in sorted(self.untracked):
+            self.stdout.write(f"?? {path}\n")
+
+    def status_for_path(self, path: str) -> str:
+        changes = self.changes[path]
+    
+        status = "  "
+        status = " D" if "workspace_deleted" in changes else status
+        status = " M" if "workspace_modified" in changes else status
+
+        return status
+
+
+    def record_change(self, path: Path, ty: str) -> None:
+        self.changed.add(str(path))
+        self.changes[str(path)].add(ty)
 
     def scan_workspace(self, prefix: str = '') -> None:
         for path, stat in self.repo.workspace.list_dir(prefix).items():
@@ -60,9 +81,13 @@ class Status(Base):
             self.check_index_entry(entry)
 
     def check_index_entry(self, entry: Entry) -> None:
-        stat = self.stats[entry.path]
+        stat = self.stats.get(entry.path, None)
+        if stat is None:
+            self.record_change(entry.path, "workspace_deleted")
+            return
+
         if not entry.stat_match(stat):
-            self.changed.add(str(entry.path))
+            self.record_change(entry.path, "workspace_modified")
             return
         
         if entry.times_match(stat):
@@ -75,7 +100,7 @@ class Status(Base):
         if entry.oid == oid:
             self.repo.index.update_entry_stat(entry, stat)
         else:
-            self.changed.add(str(entry.path))
+            self.record_change(entry.path, "workspace_modified")
 
     def _is_trackable_file(self, path: Path, stat: os.stat_result) -> bool:
         if self._is_file(stat):
