@@ -1,13 +1,37 @@
+from typing import cast
 from legit.author import Author
 
 
 class Commit:
-    def __init__(self, parent: str, tree: str, author: Author, message: str) -> None:
+    def __init__(self, parent: str | None, tree: str, author: Author, message: str) -> None:
         self.parent: str | None = parent
         self.tree: str = tree
         self.author: Author = author
         self.message: str = message
         self._oid: str | None = None
+
+    @classmethod
+    def parse(cls, data: bytes) -> 'Commit':
+        headers: dict[str, str] = {}
+
+        lines = data.decode('utf-8').split('\n')
+        idx = 0
+        for idx, line in enumerate(lines):
+            if not line:
+                break
+            key, val = line.split(' ', 1)
+            headers[key] = val
+
+        message = '\n'.join(lines[idx+1:])
+
+        assert headers['tree'] is not None
+
+        return cls(
+            headers.get('parent'),
+            headers['tree'],
+            cast(Author, headers['author']),  # we don't need structured Author info yet
+            message,
+        )
 
     @property
     def oid(self) -> str:

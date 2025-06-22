@@ -2,11 +2,56 @@ from legit.index import Entry
 from typing import Callable, MutableMapping
 from pathlib import Path
 
+
+class DatabaseEntry:
+    TREE_MODE = 0o40000
+
+    def __init__(self, oid: str, mode: int) -> None:
+        self.oid = oid
+        self.mode = mode
+    
+    def is_tree(self) -> bool:
+        return self.mode == DatabaseEntry.TREE_MODE
+
 class Tree:
-    def __init__(self) -> None:
-        self.entries: MutableMapping[str, 'Entry | Tree'] = {}
+    def __init__(self, entries: MutableMapping[str, 'DatabaseEntry | Entry | Tree'] | None = None) -> None:
+        self.entries: MutableMapping[str, DatabaseEntry | Entry | Tree] = (
+            entries if entries is not None else {} 
+        )
         self.oid = None
 
+    @classmethod
+    def parse(cls, payload: bytes) -> "Tree":
+        """
+        Parse the body of a git tree object:
+
+            <mode> SP <name> NUL <20-byte raw SHA-1>
+            … repeated until end of payload
+        """
+        entries: MutableMapping[str, DatabaseEntry | Entry | Tree] = {}
+        idx = 0
+        end = len(payload)
+
+        while idx < end:
+            # mode (octal string up to the first space)
+            sp = payload.index(b" ", idx)
+            mode = int(payload[idx:sp].decode(), 8)
+            idx = sp + 1
+
+            # name (utf-8 up to NULL)
+            nul = payload.index(b"\x00", idx)
+            name = payload[idx:nul].decode("utf-8", errors="replace")
+            idx = nul + 1
+
+            # 20-byte object id 
+            oid_bytes = payload[idx : idx + 20]
+            oid = oid_bytes.hex()
+            idx += 20
+
+            entries[name] = DatabaseEntry(oid=oid, mode=mode)
+
+        return cls(entries)
+    
     @classmethod
     def from_entries(cls, entries: dict[Path, Entry]) -> 'Tree':
         entries = dict(sorted(entries.items(), key=lambda x: x[1].path))
@@ -38,6 +83,7 @@ class Tree:
                 assert entry.oid is not None
                 oid = entry.oid
             else:
+                assert not isinstance(entry, DatabaseEntry)
                 m = entry.mode()
                 mode_str = oct(m)[2:]
                 oid = entry.oid

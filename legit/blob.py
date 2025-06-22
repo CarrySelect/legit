@@ -2,6 +2,10 @@ class Blob:
     def __init__(self, data: str) -> None:
         self.data: str = data
         self._oid: str | None = None
+    
+    @classmethod
+    def parse(cls, data: str) -> 'Blob':
+        return cls(data)
 
     @property
     def oid(self) -> str:

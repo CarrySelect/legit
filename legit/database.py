@@ -1,4 +1,5 @@
 import hashlib
+from typing import MutableMapping, Type
 import zlib
 import os
 import random
@@ -8,10 +9,22 @@ from legit.tree import Tree
 from legit.commit import Commit
 from legit.blob import Blob
 
+TYPES: MutableMapping[str, Type[Blob | Commit | Tree]] = {
+    "blob": Blob,
+    "commit": Commit,
+    "tree": Tree,
+}
+
 
 class Database:
     def __init__(self, path: Path) -> None:
         self.path: Path = path
+        self.objects: MutableMapping[str, Blob | Commit | Tree] = {}
+
+    def load(self, oid: str) -> None:
+        obj = self.read_object(oid)
+        self.objects[oid] = obj
+        return obj
 
     def store(self, obj: Blob | Commit | Tree) -> None:
         content = self.serialize_object(obj)
@@ -53,6 +66,26 @@ class Database:
         file.close()
 
         temp_path.rename(object_path)
+
+    def read_object(self, oid: str) -> Blob | Commit | Tree:
+        object_path = self.path / str(oid[:2]) / str(oid[2:])
+        with open(object_path, 'rb') as f:
+            bindata = f.read()
+
+        data = zlib.decompress(bindata)
+
+        space_idx = data.index(b" ")
+        nul_idx   = data.index(b"\x00", space_idx)
+
+        obj_type = data[:space_idx].decode()
+        size     = int(data[space_idx + 1:nul_idx])
+        payload  = data[nul_idx + 1:] 
+    
+        obj = TYPES[obj_type].parse(payload)
+        obj.oid = oid
+
+        return obj
+
 
     def generate_temp_name(self) -> str:
         return f"tmp_obj_" + ''.join(random.choices(string.ascii_letters + string.digits, k=6))
