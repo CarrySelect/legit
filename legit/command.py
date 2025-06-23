@@ -9,7 +9,7 @@ from legit.cmd_base import Base
 from legit.cmd_init import Init
 from legit.cmd_add import Add
 from legit.cmd_commit import Commit
-from legit.cmd_status import Status
+from legit.cmd_status import StatusCmd
 
 
 class Command:
@@ -20,7 +20,7 @@ class Command:
         "init": Init,
         "add": Add,
         "commit": Commit,
-        "status": Status,
+        "status": StatusCmd,
     }
 
     @staticmethod

@@ -4,6 +4,7 @@ from legit.database import Database
 from legit.index import Index
 from legit.refs import Refs
 from legit.workspace import Workspace
+from legit.status import Status
 
 
 class Repository:
@@ -13,3 +14,6 @@ class Repository:
         self.index: Index = Index(git_path / "index")
         self.refs: Refs = Refs(git_path)
         self.workspace: Workspace = Workspace(git_path.parent)
+
+    def status(self) -> Status:
+        return Status(self)
