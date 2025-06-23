@@ -1,7 +1,7 @@
 from collections import defaultdict
 import os
 import stat
-from typing import TextIO, MutableMapping
+from typing import TextIO, MutableMapping, cast
 from pathlib import Path
 
 from legit import index
@@ -91,6 +91,7 @@ class Status(Base):
             head_oid = None
             return
 
+        assert head_oid is not None
         commit = self.repo.database.load(head_oid)
         assert isinstance(commit, Commit)
         self.read_tree(commit.tree)
@@ -208,8 +209,8 @@ class Status(Base):
             self.stdout.write(f"?? {path}\n")
 
     def status_for_path(self, path: str) -> str:
-        left = SHORT_STATUS.get(self.index_changes.get(path), ' ')
-        right = SHORT_STATUS.get(self.workspace_changes.get(path), ' ')
+        left = SHORT_STATUS.get(cast(str, self.index_changes.get(path)), ' ')
+        right = SHORT_STATUS.get(cast(str, self.workspace_changes.get(path)), ' ')
         return left + right
 
     def record_change(self, path: Path, structure: MutableMapping[str, str], ty: str) -> None:
