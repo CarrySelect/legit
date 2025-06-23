@@ -4,7 +4,7 @@ from legit.index import Entry, Index
 from legit.status import Status
 from legit.repository import Repository
 from legit.blob import Blob
-from legit.diff import diff
+from legit.diff import diff, diff_hunks
 
 
 class Target:
@@ -103,9 +103,10 @@ class Diff(Base):
         self.stdout.write(oid_range + '\n')
         self.stdout.write(f"--- {a.diff_path()}" + '\n')
         self.stdout.write(f"+++ {b.diff_path()}" + '\n')
-        
-        for edit in diff(a.data, b.data):
-            self.stdout.write(str(edit))
+    
+        hunks = diff_hunks(a.data, b.data)
+        for hunk in hunks:
+            self.stdout.write(str(hunk))
 
     def _short(self, oid: str) -> str:
         return self.repo.database.short_oid(oid)
