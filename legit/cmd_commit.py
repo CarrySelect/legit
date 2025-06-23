@@ -45,6 +45,6 @@ class Commit(Base):
         
         repo.refs.update_head(commit.oid)
 
-        is_root: str = "(root-commit)" if parent is None else ""
-        print(f"[{is_root} {commit.oid}] {message.splitlines()[0]}")
+        is_root: str = "(root-commit) " if parent is None else ""
+        print(f"[{is_root}{commit.oid}] {message.splitlines()[0]}")
 
