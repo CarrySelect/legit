@@ -86,6 +86,8 @@ class Database:
 
         return obj
 
+    def short_oid(self, oid: str) -> str:
+        return oid[:6]
 
     def generate_temp_name(self) -> str:
         return f"tmp_obj_" + ''.join(random.choices(string.ascii_letters + string.digits, k=6))

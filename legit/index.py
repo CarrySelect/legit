@@ -40,6 +40,9 @@ class Index:
         entry.update_stat(stat)
         self.changed = True
 
+    def entry_for_path(self, path: Path) -> 'Entry':
+        return self.entries[path]
+
     def is_tracked_file(self, path: Path) -> bool:
         return path in self.entries
 
