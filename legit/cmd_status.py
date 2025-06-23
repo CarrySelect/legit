@@ -12,6 +12,7 @@ from legit.index import Entry
 from legit.repository import Repository
 from legit.tree import DatabaseEntry, Tree
 from legit.status import Status
+from legit.cmd_color import Color
 
 
 LABEL_WIDTH = 12
@@ -27,20 +28,6 @@ LONG_STATUS: MutableMapping[str, str] = {
     "deleted": "deleted:",
     "modified": "modified:",
 }
-
-
-class Color:
-    SGR_CODES: dict[str, int] = {
-        "red": 31,
-        "green": 32,
-    }
-
-    @staticmethod
-    def format(color: str, msg: str) -> str:
-        code = Color.SGR_CODES.get(color)
-        if code is None:
-            return msg
-        return f"\033[{code}m{msg}\033[0m"
 
 
 class StatusCmd(Base):
