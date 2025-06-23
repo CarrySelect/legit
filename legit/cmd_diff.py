@@ -4,15 +4,17 @@ from legit.index import Entry, Index
 from legit.status import Status
 from legit.repository import Repository
 from legit.blob import Blob
+from legit.diff import diff
 
 
 class Target:
     NULL_PATH = "/dev/null"
 
-    def __init__(self, path: Path, oid: str, mode: str | None) -> None:
+    def __init__(self, path: Path, oid: str, mode: str | None, data: str) -> None:
         self.path: Path = path
         self.oid: str = oid
         self.mode: str | None = mode
+        self.data: str = data
 
     def diff_path(self):
         return self.path if self.mode is not None else Target.NULL_PATH
@@ -51,20 +53,24 @@ class Diff(Base):
     
     def from_head(self, path: Path) -> 'Target':
         entry = self.status_state.head_tree[path]
-        return Target(path, entry.oid, oct(entry.mode)[2:])
+        blob = self.repo.database.load(entry.oid)
+        assert isinstance(blob, Blob)
+        return Target(path, entry.oid, oct(entry.mode)[2:], blob.data)
 
     def from_index(self, path: Path) -> 'Target':
         entry = self.repo.index.entry_for_path(path)
-        return Target(path, entry.oid, oct(entry.mode())[2:])
+        blob = self.repo.database.load(entry.oid)
+        assert isinstance(blob, Blob)
+        return Target(path, entry.oid, oct(entry.mode())[2:], blob.data)
 
     def from_file(self, path: Path) -> 'Target':
         blob = Blob(self.repo.workspace.read_file(path))
         oid = self.repo.database.hash_object(blob)
         mode = Entry.mode_for_stat(self.status_state.stats[path])
-        return Target(path, oid, oct(mode)[2:])
+        return Target(path, oid, oct(mode)[2:], blob.data)
 
     def from_nothing(self, path: Path) -> 'Target':
-        return Target(path, Diff.NULL_OID, None)
+        return Target(path, Diff.NULL_OID, None, '')
 
     def print_diff(self, a: Target, b: Target) -> None:
         if a.oid == b.oid:
@@ -97,33 +103,9 @@ class Diff(Base):
         self.stdout.write(oid_range + '\n')
         self.stdout.write(f"--- {a.diff_path()}" + '\n')
         self.stdout.write(f"+++ {b.diff_path()}" + '\n')
-
-    def diff_file_deleted(self, path: Path) -> None:
-        entry = self.repo.index.entry_for_path(path)
-        a_oid = entry.oid
-        a_mode = oct(entry.mode())[2:]
-
-        b_oid = Diff.NULL_OID
-        b_mode = None
-
-        a = Target(path, a_oid, a_mode)
-        b = Target(path, b_oid, b_mode)
-
-        self.print_diff(a, b)
-
-    def diff_file_modified(self, path: Path) -> None:
-        entry = self.repo.index.entry_for_path(path)
-        a_oid = entry.oid
-        a_mode = oct(entry.mode())[2:]
-
-        blob = Blob(self.repo.workspace.read_file(path))
-        b_oid = self.repo.database.hash_object(blob)
-        b_mode = oct(entry.mode_for_stat(self.status_state.stats[path]))[2:]
-
-        a = Target(path, a_oid, a_mode)
-        b = Target(path, b_oid, b_mode)
         
-        self.print_diff(a, b)
+        for edit in diff(a.data, b.data):
+            self.stdout.write(str(edit))
 
     def _short(self, oid: str) -> str:
         return self.repo.database.short_oid(oid)

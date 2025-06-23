@@ -2,38 +2,54 @@ from dataclasses import dataclass
 from typing import List, Dict, Generator
 
 
+SYMBOLS: dict[str, str] = {
+    'eql': ' ',
+    'ins': '+',
+    'del': '-',
+}
+
+@dataclass
+class Line:
+    number: int
+    text: str
+
 @dataclass
 class Edit:
-    """A single edit operation produced by the diff.
+    ty: str
+    a_line: Line | None = None
+    b_line: Line | None = None
 
-    op   – one of 'ins' (insert), 'del' (delete), 'eql' (equal)
-    line – the item (line/element) affected
-    """
-    op: str
-    line: str
+    def __str__(self) -> str:
+        line = self.a_line or self.b_line
+        assert line is not None
+        return SYMBOLS[self.ty] + line.text
 
 
 class Myers:
     """Myers O((N + M) D) diff algorithm for two sequences."""
 
-    def __init__(self, a: list[str], b: list[str]):
+    def __init__(self, a: list[Line], b: list[Line]):
         self.a = a
         self.b = b
 
     @classmethod
-    def diff(cls, a: list[str], b: list[str]) -> list[Edit]:
+    def diff(cls, a: list[Line], b: list[Line]) -> list[Edit]:
         return cls(a, b)._diff()
 
     def _diff(self) -> list[Edit]:
         edits: list[Edit] = []
 
         for prev_x, prev_y, x, y in self._backtrack():
-            if x == prev_x:              # insertion
-                edits.append(Edit("ins", self.b[prev_y]))
-            elif y == prev_y:            # deletion
-                edits.append(Edit("del", self.a[prev_x]))
-            else:                        # equality (diagonal move)
-                edits.append(Edit("eql", self.a[prev_x]))
+            if x == prev_x: # insertion
+                b_line = self.b[prev_y]
+                edits.append(Edit("ins", None, b_line))
+            elif y == prev_y: # deletion
+                a_line = self.a[prev_x]
+                edits.append(Edit("del", a_line, None))
+            else: # equality (diagonal move)
+                a_line = self.a[prev_x]
+                b_line = self.b[prev_y]
+                edits.append(Edit("eql", a_line, b_line))
 
         edits.reverse()
         return edits
@@ -95,7 +111,7 @@ class Myers:
                 y = x - k
 
                 # Follow diagonal — matching elements — as far as possible.
-                while x < n and y < m and self.a[x] == self.b[y]:
+                while x < n and y < m and self.a[x].text == self.b[y].text:
                     x += 1
                     y += 1
 

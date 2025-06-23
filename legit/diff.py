@@ -1,12 +1,22 @@
-from legit.myers import Edit, Myers
+from typing import Union, List
+from legit.myers import Edit, Line, Myers
 
 
-def lines(document: str | list[str]) -> list[str]:
+def lines(document: Union[str, List[str]]) -> List[Line]:
+    """
+    Turn a string or list of strings into a list of Line objects,
+    numbering from 1.
+    """
     if isinstance(document, str):
-        return document.splitlines()
+        doc_lines = document.splitlines(keepends=True)
     else:
-        return document
+        doc_lines = document
+    return [Line(i + 1, text) for i, text in enumerate(doc_lines)]
 
-
-def diff(a: str | list[str], b: str | list[str]) -> list[Edit]:
+def diff(a: Union[str, List[str]], b: Union[str, List[str]]) -> List[Edit]:
+    """
+    Compute the diff between a and b, returning a list of Edit objects.
+    """
     return Myers.diff(lines(a), lines(b))
+
+
