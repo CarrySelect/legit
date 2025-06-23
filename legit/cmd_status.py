@@ -76,14 +76,14 @@ class StatusCmd(Base):
         if not changeset:
             return
         
-        self.stdout.write(message + '\n')
-        self.stdout.write('\n')
+        self.println(message)
+        self.println('')
 
         for path, ty in changeset.items():
             status = LONG_STATUS[ty].ljust(LABEL_WIDTH, ' ') if ty else ''
-            self.stdout.write("\t" + self.fmt(color, f"{status}{path}") + '\n')
+            self.println("\t" + self.fmt(color, f"{status}{path}"))
 
-        self.stdout.write('\n')
+        self.println('')
 
     def print_commit_status(self) -> None:
         assert self.status_state is not None
@@ -91,28 +91,25 @@ class StatusCmd(Base):
             return
 
         if self.status_state.workspace_changes:
-            self.stdout.write("no changes added to commit\n")
+            self.println("no changes added to commit\n")
         elif self.status_state.untracked:
-            self.stdout.write("nothing added to commit but untracked files present\n")
+            self.println("nothing added to commit but untracked files present\n")
         else:
-            self.stdout.write("nothing to commit, working tree clean\n")
+            self.println("nothing to commit, working tree clean\n")
 
     def print_porcelain_format(self) -> None:
         assert self.status_state is not None
         for path in sorted(self.status_state.changed):
             status = self.status_for_path(path)
-            self.stdout.write(f"{status} {path}\n")
+            self.println(f"{status} {path}")
 
         for path in sorted(self.status_state.untracked):
-            self.stdout.write(f"?? {path}\n")
+            self.println(f"?? {path}")
 
     def status_for_path(self, path: str) -> str:
         assert self.status_state is not None
         left = SHORT_STATUS.get(cast(str, self.status_state.index_changes.get(path)), ' ')
         right = SHORT_STATUS.get(cast(str, self.status_state.workspace_changes.get(path)), ' ')
         return left + right
-
-    def fmt(self, color: str, msg: str) -> str:
-        return Color.format(color, msg) if self.stdout.isatty() else msg
 
 

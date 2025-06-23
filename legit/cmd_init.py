@@ -29,4 +29,4 @@ class Init(Base):
                 self.stderr.write(f"fatal: {e.strerror}")
                 self.exit(1)
 
-        self.stdout.write(f"Initialized empty Legit repository in {git_path}" + '\n')
+        self.println(f"Initialized empty Legit repository in {git_path}")

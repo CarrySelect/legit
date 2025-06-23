@@ -35,9 +35,6 @@ class Base:
         assert self.stdout is not None
         self.stdout = self.pager.input
 
-    def _print(self, string: str) -> None:
-        self.stdout.write(string + '\n')
-
     def exit(self, status: int = 0) -> None:
         self.status = status
         raise ExitSignal(self.status)
@@ -69,6 +66,12 @@ class Base:
         """Subclasses must override this."""
         raise NotImplementedError(f"{self.__class__.__name__}.run() not implemented")
 
+    def println(self, string: str) -> None:
+        try:
+            self.stdout.write(string + '\n')
+            self.stdout.flush()
+        except BrokenPipeError:
+            self.exit(0)
 
 class ExitSignal(Exception):
     """Internal exception to short-circuit out of `run()` with a status."""

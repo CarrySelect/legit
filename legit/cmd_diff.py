@@ -113,7 +113,7 @@ class Diff(Base):
             self.print_diff_hunk(hunk)
 
     def print_diff_hunk(self, hunk: Hunk) -> None:
-        self.stdout.write(self.fmt("cyan", hunk.header()) + '\n')
+        self.println(self.fmt("cyan", hunk.header()))
         for edit in hunk.edits:
             self.print_diff_edit(edit)
 
@@ -122,16 +122,16 @@ class Diff(Base):
 
         match edit.ty:
             case c if c == "eql":
-                self.stdout.write(text + '\n')
+                self.println(text)
             case c if c == "ins":
-                self.stdout.write(self.fmt("green", text) + '\n')
+                self.println(self.fmt("green", text))
             case c if c == "del":
-                self.stdout.write(self.fmt("red", text) + '\n')
+                self.println(self.fmt("red", text))
 
     def _short(self, oid: str) -> str:
         return self.repo.database.short_oid(oid)
 
     def _header(self, string: str) -> None:
-        self.stdout.write(self.fmt("bold", string) + '\n')
+        self.println(self.fmt("bold", string))
 
 
