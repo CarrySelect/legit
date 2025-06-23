@@ -24,15 +24,34 @@ class Diff(Base):
     def run(self) -> None:
         self.repo: Repository = Repository(self.dir / ".git")
         self.repo.index.load()
-        self.status_state: Status = self.repo.status()
+        self.status_state: Status = self.repo.status() 
+        
+        if len(self.args) > 0 and self.args[0] == '--cached':
+            self.diff_head_index()
+        else:
+            self.diff_index_workspace()
+        
+        self.exit(0)
 
+    def diff_head_index(self) -> None:
+        for path, state in self.status_state.index_changes.items():
+            if state == 'modified':
+                self.print_diff(self.from_head(Path(path)), self.from_index(Path(path)))
+            elif state == 'added':
+                self.print_diff(self.from_nothing(Path(path)), self.from_index(Path(path)))
+            elif state == 'deleted':
+                self.print_diff(self.from_head(Path(path)), self.from_nothing(Path(path)))
+
+    def diff_index_workspace(self) -> None:
         for path, state in self.status_state.workspace_changes.items():
             if state == 'modified':
                 self.print_diff(self.from_index(Path(path)), self.from_file(Path(path)))
             elif state == 'deleted':
                 self.print_diff(self.from_index(Path(path)), self.from_nothing(Path(path)))
-
-        self.exit(0)
+    
+    def from_head(self, path: Path) -> 'Target':
+        entry = self.status_state.head_tree[path]
+        return Target(path, entry.oid, oct(entry.mode)[2:])
 
     def from_index(self, path: Path) -> 'Target':
         entry = self.repo.index.entry_for_path(path)
@@ -59,7 +78,9 @@ class Diff(Base):
         self.print_diff_content(a, b)
 
     def print_diff_mode(self, a: Target, b: Target) -> None:
-        if b.mode is None:
+        if a.mode is None:
+            self.stdout.write(f"new file mode {b.mode}" + '\n')
+        elif b.mode is None:
             self.stdout.write(f"deleted file mode {a.mode}" + '\n')
         elif a.mode != b.mode:
             self.stdout.write(f"old mode {a.mode}" + '\n')
