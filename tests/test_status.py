@@ -140,31 +140,31 @@ class TestHeadIndexChanges:
     def test_reports_file_added_to_tracked_directory(self, legit_cmd, write_file):
         write_file("a/4.txt", "four")
         legit_cmd("add", ".")
-        assert_status(legit_cmd, " A a/4.txt\n")
+        assert_status(legit_cmd, "A  a/4.txt\n")
 
     def test_reports_file_added_to_untracked_directory(self, legit_cmd, write_file):
         write_file("d/e/5.txt", "five")
         legit_cmd("add", ".")
-        assert_status(legit_cmd, " A d/e/5.txt\n")
+        assert_status(legit_cmd, "A  d/e/5.txt\n")
 
     def test_reports_modified_modes(self, legit_cmd, make_executable):
         make_executable("1.txt")
         legit_cmd("add", ".")
-        assert_status(legit_cmd, "M 1.txt\n")
+        assert_status(legit_cmd, "M  1.txt\n")
 
     def test_reports_modified_contents(self, legit_cmd, write_file):
         write_file("a/b/3.txt", "changed")
         legit_cmd("add", ".")
-        assert_status(legit_cmd, "M a/b/3.txt\n")
+        assert_status(legit_cmd, "M  a/b/3.txt\n")
 
     def test_reports_deleted_files(self, legit_cmd, delete):
         delete("1.txt")
         delete(".git/index")
         legit_cmd("add", ".")
-        assert_status(legit_cmd, "D 1.txt\n")
+        assert_status(legit_cmd, "D  1.txt\n")
 
     def test_reports_all_deleted_files_inside_directories(self, legit_cmd, delete):
         delete("a")
         delete(".git/index")
         legit_cmd("add", ".")
-        assert_status(legit_cmd, "D a/2.txt\nD a/b/3.txt\n")
+        assert_status(legit_cmd, "D  a/2.txt\nD  a/b/3.txt\n")
