@@ -28,6 +28,20 @@ LONG_STATUS: MutableMapping[str, str] = {
 }
 
 
+class Color:
+    SGR_CODES: dict[str, int] = {
+        "red": 31,
+        "green": 32,
+    }
+
+    @staticmethod
+    def format(color: str, msg: str) -> str:
+        code = Color.SGR_CODES.get(color)
+        if code is None:
+            return msg
+        return f"\033[{code}m{msg}\033[0m"
+
+
 class Status(Base):
     def __init__(
         self,
@@ -61,6 +75,9 @@ class Status(Base):
         self.print_results()
 
         self.exit(0)
+
+    def fmt(self, color: str, msg: str) -> str:
+        return Color.format(color, msg) if self.stdout.isatty() else msg
 
     def collect_deleted_head_files(self) -> None:
         for path in self.head_tree.keys():
@@ -150,13 +167,13 @@ class Status(Base):
             self.print_long_format()
 
     def print_long_format(self) -> None:
-        self.print_changes("Changes to be committed", self.index_changes)
-        self.print_changes("Changes not staged for commit", self.workspace_changes)
-        self.print_changes("Untracked files", {p: '' for p in self.untracked})
+        self.print_changes("Changes to be committed", self.index_changes, 'green')
+        self.print_changes("Changes not staged for commit", self.workspace_changes, 'red')
+        self.print_changes("Untracked files", {p: '' for p in sorted(self.untracked)}, 'red')
 
         self.print_commit_status()
 
-    def print_changes(self, message: str, changeset: MutableMapping[str, str]) -> None:
+    def print_changes(self, message: str, changeset: MutableMapping[str, str], color: str) -> None:
         if not changeset:
             return
         
@@ -165,7 +182,7 @@ class Status(Base):
 
         for path, ty in changeset.items():
             status = LONG_STATUS[ty].ljust(LABEL_WIDTH, ' ') if not ty else ''
-            self.stdout.write(f"\t{status}{path}\n")
+            self.stdout.write("\t" + self.fmt(color, f"{status}{path}") + '\n')
 
         self.stdout.write('\n')
 
