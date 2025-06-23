@@ -12,6 +12,22 @@ from legit.index import Entry
 from legit.repository import Repository
 from legit.tree import DatabaseEntry, Tree
 
+
+LABEL_WIDTH = 12
+
+SHORT_STATUS: MutableMapping[str, str] = {
+    "added": "A",
+    "modified": "M",
+    "deleted": "D",
+}
+
+LONG_STATUS: MutableMapping[str, str] = {
+    "added": "new file:",
+    "deleted": "deleted:",
+    "modified": "modified:",
+}
+
+
 class Status(Base):
     def __init__(
         self,
@@ -25,7 +41,8 @@ class Status(Base):
         super().__init__(_dir, env, args, stdin, stdout, stderr)
         self.repo: Repository = Repository(self.dir / ".git")
         self.stats: MutableMapping[Path, os.stat_result] = {}
-        self.changes: MutableMapping[str, set[str]] = defaultdict(set)
+        self.index_changes: MutableMapping[str, str] = {}
+        self.workspace_changes: MutableMapping[str, str] = {}
         self.changed: set[str] = set()
         self.untracked: set[str] = set()
         self.head_tree: MutableMapping[Path, DatabaseEntry] = {}
@@ -48,7 +65,7 @@ class Status(Base):
     def collect_deleted_head_files(self) -> None:
         for path in self.head_tree.keys():
             if not self.repo.index.is_tracked_file(path):
-                self.record_change(path, "index_deleted")
+                self.record_change(path, self.index_changes, "deleted")
 
     def load_head_tree(self) -> None:
         try:
@@ -88,12 +105,12 @@ class Status(Base):
     
         # If we have no stats for this path, the file has been deleted from the disk.
         if stat_result is None:
-            self.record_change(entry.path, "workspace_deleted")
+            self.record_change(entry.path, self.workspace_changes, "deleted")
             return
     
         # If the file's metadata (mode, size) doesn't match the index, it's modified.
         if not entry.stat_match(stat_result):
-            self.record_change(entry.path, "workspace_modified")
+            self.record_change(entry.path, self.workspace_changes, "modified")
             return
     
         # For performance, if timestamps match, we assume the content is unchanged.
@@ -111,17 +128,61 @@ class Status(Base):
             self.repo.index.update_entry_stat(entry, stat_result)
         else:
             # The content has changed.
-            self.record_change(entry.path, "workspace_modified")
+            self.record_change(entry.path, self.workspace_changes, "modified")
 
     def check_index_against_head_tree(self, entry: Entry) -> None:
         item = self.head_tree.get(entry.path, None)
         if item is not None:
             if entry.mode() != item.mode or entry.oid != item.oid:
-                self.record_change(entry.path, "index_modified")
+                self.record_change(entry.path, self.index_changes, "modified")
         else:
-            self.record_change(entry.path, "index_added")
+            self.record_change(entry.path, self.index_changes, "added")
 
     def print_results(self) -> None:
+        try:
+            fmt = self.args[0]
+        except IndexError:
+            fmt = None
+
+        if fmt == '--porcelain':
+            self.print_porcelain_format()
+        else:
+            self.print_long_format()
+
+    def print_long_format(self) -> None:
+        self.print_changes("Changes to be committed", self.index_changes)
+        self.print_changes("Changes not staged for commit", self.workspace_changes)
+        self.print_changes("Untracked files", {p: '' for p in self.untracked})
+
+        self.print_commit_status()
+
+    def print_changes(self, message: str, changeset: MutableMapping[str, str]) -> None:
+        if not changeset:
+            return
+        
+        self.stdout.write(message + '\n')
+        self.stdout.write('\n')
+
+        for path, ty in changeset.items():
+            status = LONG_STATUS[ty].ljust(LABEL_WIDTH, ' ') if not ty else ''
+            self.stdout.write(f"\t{status}{path}\n")
+
+        self.stdout.write('\n')
+
+    def print_commit_status(self) -> None:
+        if self.index_changes:
+            return
+
+        if self.workspace_changes:
+            self.stdout.write("no changes added to commit\n")
+        elif self.untracked:
+            self.stdout.write("nothing added to commit but untracked files present\n")
+        else:
+            self.stdout.write("nothing to commit, working tree clean\n")
+
+
+
+    def print_porcelain_format(self) -> None:
         for path in sorted(self.changed):
             status = self.status_for_path(path)
             self.stdout.write(f"{status} {path}\n")
@@ -130,30 +191,13 @@ class Status(Base):
             self.stdout.write(f"?? {path}\n")
 
     def status_for_path(self, path: str) -> str:
-        changes = self.changes[path]
-   
-        index_status = " "
-        if "index_modified" in changes:
-            index_status = "M"
-        elif "index_deleted" in changes:
-            index_status = "D"
+        left = SHORT_STATUS.get(self.index_changes.get(path), ' ')
+        right = SHORT_STATUS.get(self.workspace_changes.get(path), ' ')
+        return left + right
 
-        work_status = " "
-        if "workspace_deleted" in changes:
-            work_status = "D"
-        elif "workspace_modified" in changes:
-            work_status = "M"
-        elif "workspace_added" in changes or "index_added" in changes:
-            # treat new paths as added *in the working tree* (tests expect “ A”)
-            work_status = "A"
-
-        # compress: only emit the working-tree column when it carries data
-        status = index_status if work_status == " " else index_status + work_status
-        return status
-
-    def record_change(self, path: Path, ty: str) -> None:
+    def record_change(self, path: Path, structure: MutableMapping[str, str], ty: str) -> None:
         self.changed.add(str(path))
-        self.changes[str(path)].add(ty)
+        structure[str(path)] = ty
 
     def scan_workspace(self, prefix: str = '') -> None:
         for path, stat in self.repo.workspace.list_dir(prefix).items():
@@ -175,11 +219,11 @@ class Status(Base):
     def check_index_entry(self, entry: Entry) -> None:
         stat = self.stats.get(entry.path, None)
         if stat is None:
-            self.record_change(entry.path, "workspace_deleted")
+            self.record_change(entry.path, self.workspace_changes, "deleted")
             return
 
         if not entry.stat_match(stat):
-            self.record_change(entry.path, "workspace_modified")
+            self.record_change(entry.path, self.workspace_changes, "modified")
             return
         
         if entry.times_match(stat):
@@ -192,7 +236,7 @@ class Status(Base):
         if entry.oid == oid:
             self.repo.index.update_entry_stat(entry, stat)
         else:
-            self.record_change(entry.path, "workspace_modified")
+            self.record_change(entry.path, self.workspace_changes, "modified")
 
     def _is_trackable_file(self, path: Path, stat: os.stat_result) -> bool:
         if self._is_file(stat):

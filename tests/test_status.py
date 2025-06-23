@@ -23,7 +23,7 @@ from tests.cmd_helper import (
 
 
 def assert_status(legit_cmd, output):
-    cmd, stdin, stdout, stderr = legit_cmd("status")
+    cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
     assert_stdout(stdout, output)
 
 
