@@ -45,7 +45,7 @@ class Hunk:
         return start, len(lines)
 
 
-def _build_hunk(self, edits: list[Edit], offset: int) -> int:
+def _build_hunk(hunk: Hunk, edits: list[Edit], offset: int) -> int:
     """
     Helper function to populate a hunk with edits and determine its end.
     This is the equivalent of the Ruby Hunk.build method.
@@ -55,7 +55,7 @@ def _build_hunk(self, edits: list[Edit], offset: int) -> int:
 
     while counter != 0:
         if offset >= 0 and counter > 0:
-            self.edits.append(edits[offset])
+            hunk.edits.append(edits[offset])
 
         offset += 1
         if offset >= len(edits):
@@ -76,8 +76,8 @@ def _build_hunk(self, edits: list[Edit], offset: int) -> int:
     return offset
 
 
-def filter(edits: list[Edit]) -> list['Hunk']:
-    hunks = []
+def filter(edits: list[Edit]) -> list[Hunk]:
+    hunks: list[Hunk] = []
     offset = 0
 
     while True:

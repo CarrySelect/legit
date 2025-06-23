@@ -18,7 +18,7 @@ class Target:
         self.mode: str | None = mode
         self.data: str = data
 
-    def diff_path(self):
+    def diff_path(self) -> Path | str:
         return self.path if self.mode is not None else Target.NULL_PATH
 
 
@@ -30,13 +30,15 @@ class Diff(Base):
         self.repo.index.load()
         self.status_state: Status = self.repo.status() 
         
+        self.setup_pager()
+
         if len(self.args) > 0 and self.args[0] == '--cached':
             self.diff_head_index()
         else:
             self.diff_index_workspace()
         
         self.exit(0)
-
+    
     def diff_head_index(self) -> None:
         for path, state in self.status_state.index_changes.items():
             if state == 'modified':
@@ -131,8 +133,5 @@ class Diff(Base):
 
     def _header(self, string: str) -> None:
         self.stdout.write(self.fmt("bold", string) + '\n')
-
-    def fmt(self, color: str, msg: str) -> str:
-        return Color.format(color, msg) if self.stdout.isatty() else msg
 
 

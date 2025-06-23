@@ -1,5 +1,8 @@
 from pathlib import Path
 from typing import MutableMapping, TextIO
+from legit.cmd_color import Color
+from legit.pager import Pager
+
 
 class Base:
     def __init__(
@@ -18,6 +21,19 @@ class Base:
         self.stdout: TextIO = stdout
         self.stderr: TextIO = stderr
         self.status: int | None = None
+        self.isatty: bool = stdout.isatty()
+        self.pager: Pager | None = None
+
+    def setup_pager(self) -> None:
+        if self.pager is not None:
+            return
+
+        if not self.stdout.isatty():
+            return
+
+        self.pager = Pager(self.env, self.stdout, self.stderr)
+        assert self.stdout is not None
+        self.stdout = self.pager.input
 
     def _print(self, string: str) -> None:
         self.stdout.write(string + '\n')
@@ -32,11 +48,22 @@ class Base:
             self.status = 0
         except ExitSignal as e:
             self.status = e.status 
+        
+        # if we installed a pager, close its write‐end and wait for it to exit
+        if getattr(self, "pager", None) is not None:
+            # self.stdout was redirected to pager.input in setup_pager()
+            self.stdout.close()
+            assert self.pager is not None
+            self.pager.wait()
+
         assert self.status is not None
         return self.status
 
     def expanded_path(self, path: str) -> Path:
         return (self.dir / path).absolute()
+
+    def fmt(self, style: str, string: str) -> str:
+        return Color.format(style, string) if self.isatty else string
 
     def run(self) -> None:
         """Subclasses must override this."""
