@@ -26,10 +26,13 @@ class Commit:
 
         assert headers['tree'] is not None
 
+        author = Author.parse(headers['author'])
+        assert author is not None
+
         return cls(
             headers.get('parent'),
             headers['tree'],
-            cast(Author, headers['author']),  # we don't need structured Author info yet
+            author, 
             message,
         )
 
@@ -41,6 +44,9 @@ class Commit:
     @oid.setter
     def oid(self, value: str) -> None:
         self._oid = value
+    
+    def title_line(self) -> str:
+        return self.message.splitlines()[0]
 
     def type(self) -> str:
         return "commit"

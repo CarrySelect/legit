@@ -7,8 +7,8 @@ class DatabaseEntry:
     TREE_MODE = 0o40000
 
     def __init__(self, oid: str, mode: int) -> None:
-        self.oid = oid
-        self.mode = mode
+        self.oid: str = oid
+        self.mode: int = mode
     
     def is_tree(self) -> bool:
         return self.mode == DatabaseEntry.TREE_MODE
@@ -18,7 +18,7 @@ class Tree:
         self.entries: MutableMapping[str, DatabaseEntry | Entry | Tree] = (
             entries if entries is not None else {} 
         )
-        self.oid = None
+        self.oid: str = ''
 
     @classmethod
     def parse(cls, payload: bytes) -> "Tree":

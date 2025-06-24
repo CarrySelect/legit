@@ -86,6 +86,16 @@ class Database:
 
         return obj
 
+    def prefix_match(self, name: str) -> list[str]:
+        object_path = self.path / str(name[:2]) / str(name[2:])
+        dirname = object_path.parent
+
+        oids = []
+        for filename in dirname.iterdir():
+            oids.append(f"{dirname.name}{filename}")
+
+        return [oid for oid in oids if oid.startswith(name)]
+
     def short_oid(self, oid: str) -> str:
         return oid[:6]
 

@@ -1,5 +1,6 @@
 import re
 from pathlib import Path
+from typing import Any, Optional
 from legit.lockfile import Lockfile
 
 
@@ -37,7 +38,7 @@ class Refs:
     def update_head(self, oid: str) -> None:
         self._update_ref_file(self.path / Refs.HEAD, oid)
 
-    def create_branch(self, branch_name: str) -> str:
+    def create_branch(self, branch_name: str, start_oid: str) -> str:
         if INVALID_NAME.search(branch_name):
             raise Refs.InvalidBranch(f"'{branch_name}' is not a valid branch name.")
         
@@ -45,7 +46,7 @@ class Refs:
         if path.is_file():
             raise Refs.InvalidBranch(f"A branch named {branch_name} already exists.")
 
-        return self._update_ref_file(path, self.read_head())
+        return self._update_ref_file(path, start_oid)
 
     def _update_ref_file(self, path: Path, oid: str) -> str:
         lockfile = Lockfile(path)
@@ -60,4 +61,21 @@ class Refs:
 
         return oid
 
+    def read_ref(self, name: str) -> Optional[str]:
+        path = self.path_for_name(name)
+        return self.read_ref_file(path) if path is not None else None
 
+    def path_for_name(self, name: str) -> Optional[Path]:
+        prefixes = (self.path, self.refs_path, self.heads_path)
+        for prefix in prefixes:
+            candidate = prefix / name
+            if candidate.is_file():
+                return candidate
+        return None
+
+    def read_ref_file(self, path: Path) -> Optional[str]:
+        try:
+            return path.read_text().strip()
+        except FileNotFoundError:
+            return None
+        
