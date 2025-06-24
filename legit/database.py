@@ -1,13 +1,15 @@
 import hashlib
-from typing import MutableMapping, Type
+from typing import MutableMapping, Optional, Type
 import zlib
 import os
 import random
 import string
 from pathlib import Path
-from legit.tree import Tree
+from legit.tree import DatabaseEntry, Tree
 from legit.commit import Commit
 from legit.blob import Blob
+from legit.tree_diff import TreeDiff
+
 
 TYPES: MutableMapping[str, Type[Blob | Commit | Tree]] = {
     "blob": Blob,
@@ -20,6 +22,11 @@ class Database:
     def __init__(self, path: Path) -> None:
         self.path: Path = path
         self.objects: MutableMapping[str, Blob | Commit | Tree] = {}
+
+    def tree_diff(self, a: str, b: str) -> dict[Path, list[Optional[DatabaseEntry]]]:
+        diff = TreeDiff(self)
+        diff.compare_oids(a, b)
+        return diff.changes
 
     def load(self, oid: str) -> Blob | Commit | Tree:
         obj = self.read_object(oid)
