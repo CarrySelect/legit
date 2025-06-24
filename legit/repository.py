@@ -1,10 +1,13 @@
 from pathlib import Path
 
+from legit.blob import Blob
+from legit.tree import DatabaseEntry
 from legit.database import Database
 from legit.index import Index
 from legit.refs import Refs
 from legit.workspace import Workspace
 from legit.status import Status
+from legit.migration import Migration
 
 
 class Repository:
@@ -17,3 +20,8 @@ class Repository:
 
     def status(self) -> Status:
         return Status(self)
+
+    def migration(self, tree_diff: dict[Path, DatabaseEntry]) -> 'Migration':
+        return Migration(self, tree_diff)
+
+

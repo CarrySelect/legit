@@ -1,7 +1,15 @@
 import os
-from typing import MutableMapping
+import shutil
+from typing import MutableMapping, TYPE_CHECKING
 from collections.abc import Iterator
 from pathlib import Path
+
+if TYPE_CHECKING:
+    from legit.repository import Migration
+else:
+    Migration = None
+
+
 
 class Workspace:
     class MissingFile(Exception):
@@ -13,6 +21,47 @@ class Workspace:
 
     def __init__(self, path: Path) -> None:
         self.path: Path = path
+
+    def apply_migration(self, migration: Migration) -> None:
+        self.apply_change_list(migration, "delete")
+
+        for d in sorted(migration.rmdirs, key=lambda p: (len(p.parts), p)):
+            self.remove_directory(d)
+
+        for d in sorted(migration.mkdirs, key=lambda p: (len(p.parts), p)):
+            self.make_directory(d)
+
+        self.apply_change_list(migration, "update")
+
+        self.apply_change_list(migration, "create")
+    
+    def apply_change_list(self, migration: Migration, action: str) -> None:
+        for filename, entry in migration.changes[action]:
+            path = self.path / filename
+
+            shutil.rmtree(path, ignore_errors=True)
+
+            if action == "delete":
+                continue
+
+            data = migration.blob_data(entry.oid)  # bytes
+            with path.open("xb") as fh:
+                fh.write(data)
+
+            os.chmod(path, entry.mode)
+
+
+    def remove_directory(self, dirname: Path) -> None:
+        shutil.rmtree(self.path / dirname, ignore_errors=True)
+
+    def make_directory(self, dirname: Path) -> None:
+        path = self.path / dirname
+        stat = dirname.stat()
+
+        if path.is_file():
+            path.unlink()
+        elif not path.is_dir():
+            path.mkdir(exist_ok=True, parents=True)
 
     def list_files(self, path: Path) -> Iterator[Path]:
         if path.is_dir():
