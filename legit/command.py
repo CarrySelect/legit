@@ -11,6 +11,7 @@ from legit.cmd_add import Add
 from legit.cmd_commit import Commit
 from legit.cmd_status import StatusCmd
 from legit.cmd_diff import Diff
+from legit.cmd_branch import Branch
 
 
 class Command:
@@ -23,6 +24,7 @@ class Command:
         "commit": Commit,
         "status": StatusCmd,
         "diff": Diff,
+        "branch": Branch,
     }
 
     @staticmethod
