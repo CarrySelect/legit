@@ -1,5 +1,6 @@
 import re
 from pathlib import Path
+from sys import path_hooks
 from typing import Any, Optional
 from legit.lockfile import Lockfile
 
@@ -21,19 +22,73 @@ class Refs:
     class InvalidBranch(Exception):
         pass
 
+    class Ref:
+        def __init__(self, oid: str) -> None:
+            self.oid: str = oid
+
+        def read_oid(self) -> str:
+            return self.oid
+
+    class SymRef:
+        def __init__(self, refs: 'Refs', path: str) -> None:
+            self.path: str = path
+            self.refs: Refs = refs
+
+        def read_oid(self) -> Optional[str]:
+            return self.refs.read_ref(self.path)
+
+        def is_head(self) -> bool:
+            return self.path == Refs.HEAD
+
     HEAD = "HEAD"
+    SYMREF = re.compile(r"^ref: (.+)$")
 
     def __init__(self, path: Path) -> None:
         self.path: Path = path
         self.refs_path: Path = self.path / "refs"
         self.heads_path: Path = self.refs_path / "heads"
 
+    def current_ref(self, source: str = "HEAD") -> 'Refs.SymRef':
+        ref = self.read_oid_or_symref(self.path / source)
+
+        if isinstance(ref, Refs.SymRef):
+            return self.current_ref(ref.path)
+
+        return Refs.SymRef(self, source)
+
+    def set_head(self, revision: str, oid: str) -> None:
+        head = self.path / Refs.HEAD
+        path = self.heads_path / revision
+
+        if path.is_file():
+            relative = path.relative_to(self.path)
+            self._update_ref_file(head, f"ref: {relative}")
+        else:
+            self._update_ref_file(head, oid)
+
+    def read_oid_or_symref(self, path: Path) -> Optional['Refs.Ref | Refs.SymRef']:
+        try:
+            data = path.read_text().strip()
+        except FileNotFoundError:
+            return None
+        m = Refs.SYMREF.match(data)
+        return Refs.SymRef(self, m.group(1)) if m else Refs.Ref(data)
+
+    def read_symref(self, path: Path) -> str:
+        ref = self.read_oid_or_symref(Path(path))
+        assert ref is not None
+        match ref:
+            case c if isinstance(c, Refs.Ref):
+                assert isinstance(ref, Refs.Ref)
+                return ref.oid
+            case c if isinstance(c, Refs.SymRef):
+                assert isinstance(ref, Refs.SymRef)
+                return self.read_symref(self.path / ref.path)
+            case _:
+                raise NotImplemented
+
     def read_head(self) -> str:
-        head_path = self.path / "HEAD"
-        if head_path.exists():
-            with open(head_path, "r") as f:
-                return f.read().strip()
-        raise FileNotFoundError(f"HEAD file not found at {head_path}")
+        return self.read_symref(self.path / Refs.HEAD)
 
     def update_head(self, oid: str) -> None:
         self._update_ref_file(self.path / Refs.HEAD, oid)
@@ -63,7 +118,7 @@ class Refs:
 
     def read_ref(self, name: str) -> Optional[str]:
         path = self.path_for_name(name)
-        return self.read_ref_file(path) if path is not None else None
+        return self.read_symref(path) if path is not None else None
 
     def path_for_name(self, name: str) -> Optional[Path]:
         prefixes = (self.path, self.refs_path, self.heads_path)

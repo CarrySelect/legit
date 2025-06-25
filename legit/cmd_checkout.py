@@ -1,10 +1,25 @@
+import textwrap
 from pathlib import Path
-from typing import cast
+from typing import cast, Optional
 from legit.cmd_base import Base
+from legit.commit import Commit
 from legit.migration import Migration
 from legit.repository import Repository
 from legit.revision import Revision
 from legit.tree import DatabaseEntry
+from legit.refs import Refs
+
+
+DETACHED_HEAD_MESSAGE = textwrap.dedent("""\
+    You are in 'detached HEAD' state. You can look around, make experimental
+    changes and commit them, and you can discard any commits you make in this
+    state without impacting any branches by performing another checkout.
+
+    If you want to create a new branch to retain commits you create, you may
+    do so (now or later) by using the branch command. Example:
+
+        legit branch <new-branch-name>
+""")
 
 
 class Checkout(Base):
@@ -12,7 +27,9 @@ class Checkout(Base):
         self.repo: Repository = Repository(self.dir / ".git")
         
         self.target: str = self.args[0]
-        self.current_oid: str = self.repo.refs.read_head()
+
+        self.current_ref: Refs.SymRef = self.repo.refs.current_ref()
+        self.current_oid: Optional[str] = self.current_ref.read_oid()
         
         revision: Revision = Revision(self.repo, self.target)
     
@@ -26,6 +43,7 @@ class Checkout(Base):
         self.repo.index.load_for_update()
         
         assert self.target_oid is not None
+        assert self.current_oid is not None
         tree_diff = self.repo.database.tree_diff(self.current_oid, self.target_oid)
         migration = self.repo.migration(cast(dict[Path, list[DatabaseEntry]], tree_diff))
         
@@ -35,7 +53,13 @@ class Checkout(Base):
             self.handle_migration_conflict(migration)
 
         self.repo.index.write_updates()
-        self.repo.refs.update_head(self.target_oid)
+        self.repo.refs.set_head(self.target, self.target_oid)
+
+        self.new_ref = self.repo.refs.current_ref()
+
+        self.print_previous_head()
+        self.print_detachment_notice()
+        self.print_new_head()
         
         self.exit(0)
 
@@ -55,3 +79,35 @@ class Checkout(Base):
                 self.stderr.write(f"hint: {line}" + '\n')
         self.stderr.write(f"error: {e}" + '\n')
         self.exit(1)
+
+    def print_previous_head(self) -> None:
+        assert self.current_oid is not None
+        if self.current_ref.is_head() and self.current_oid != self.target_oid:
+            self.print_head_position("Previous HEAD was", self.current_oid)
+
+    def print_head_position(self, msg: str, oid: str) -> None:
+        commit = self.repo.database.load(oid)
+        assert isinstance(commit, Commit)
+
+        short = self.repo.database.short_oid(commit.oid)
+
+        self.stderr.write(f"{msg} {short} {commit.title_line()}\n")
+
+    def print_detachment_notice(self) -> None:
+        assert self.current_ref is not None
+        if not (self.new_ref.is_head() and not self.current_ref.is_head()):
+            return
+
+        self.stderr.write(f"Note: checking out '{self.target}'.\n")
+        self.stderr.write('\n')
+        self.stderr.write(DETACHED_HEAD_MESSAGE)
+        self.stderr.write('\n')
+
+    def print_new_head(self) -> None:
+        if self.new_ref.is_head():
+            assert self.target_oid is not None
+            self.print_head_position("HEAD is now at", self.target_oid)
+        elif self.new_ref == self.current_ref:
+            self.stderr.write(f"Already on '{self.target}'\n")
+        else:
+            self.stderr.write(f"Switched to branch '{self.target}'\n")
