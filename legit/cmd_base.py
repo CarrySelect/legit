@@ -46,9 +46,7 @@ class Base:
         except ExitSignal as e:
             self.status = e.status 
         
-        # if we installed a pager, close its write‐end and wait for it to exit
         if getattr(self, "pager", None) is not None:
-            # self.stdout was redirected to pager.input in setup_pager()
             self.stdout.close()
             assert self.pager is not None
             self.pager.wait()

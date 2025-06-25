@@ -26,6 +26,7 @@ class Database:
     def tree_diff(self, a: str, b: str) -> dict[Path, list[Optional[DatabaseEntry]]]:
         diff = TreeDiff(self)
         diff.compare_oids(a, b)
+        print(diff.changes)
         return diff.changes
 
     def load(self, oid: str) -> Blob | Commit | Tree:

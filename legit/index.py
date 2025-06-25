@@ -41,7 +41,7 @@ class Index:
         self.changed = True
 
     def entry_for_path(self, path: Path) -> 'Entry':
-        return self.entries[path]
+        return self.entries.get(path)
 
     def is_tracked_file(self, path: Path) -> bool:
         return path in self.entries
@@ -57,6 +57,11 @@ class Index:
         entry: Entry = Entry.create(path, oid, stat)
         self.discard_conflicts(entry)
         self.store_entry(entry)
+        self.changed = True
+    
+    def remove(self, path: Path) -> None:
+        self.remove_entry(path)
+        self.remove_children(path)
         self.changed = True
 
     def discard_conflicts(self, entry: 'Entry') -> None:

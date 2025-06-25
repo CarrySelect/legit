@@ -16,10 +16,12 @@ from legit.commit import Commit
 from legit.tree import Tree
 from legit.blob import Blob
 from legit.index import Entry
+from legit.inspector import Inspector
 
 
 class Status:
     def __init__(self, repo: Repository) -> None:
+        self.inspector: Inspector = Inspector(repo)
         self.repo = repo
         self.stats: MutableMapping[Path, os.stat_result] = {}
         self.index_changes: MutableMapping[str, str] = {}
@@ -73,43 +75,22 @@ class Status:
         to detect unstaged changes (modified, deleted).
         """
         # Attempt to get the file's status from our scan of the workspace.
-        stat_result = self.stats.get(entry.path, None)
-    
-        # If we have no stats for this path, the file has been deleted from the disk.
-        if stat_result is None:
-            self.record_change(entry.path, self.workspace_changes, "deleted")
-            return
-    
-        # If the file's metadata (mode, size) doesn't match the index, it's modified.
-        if not entry.stat_match(stat_result):
-            self.record_change(entry.path, self.workspace_changes, "modified")
-            return
-    
-        # For performance, if timestamps match, we assume the content is unchanged.
-        if entry.times_match(stat_result):
-            return
-    
-        # If timestamps differ, we must hash the file's content to be sure.
-        data = self.repo.workspace.read_file(entry.path)
-        blob = Blob(data)
-        oid = self.repo.database.hash_object(blob)
-    
-        if entry.oid == oid:
-            # The content is identical, so we just update the index with the new
-            # timestamp to avoid re-hashing next time.
-            self.repo.index.update_entry_stat(entry, stat_result)
+        stat_result = self.stats.get(entry.path)
+
+        status = self.inspector.compare_index_to_workspace(entry, stat_result)
+
+        if status is not None:
+            self.record_change(entry.path, self.workspace_changes, status)
         else:
-            # The content has changed.
-            self.record_change(entry.path, self.workspace_changes, "modified")
+            self.repo.index.update_entry_stat(entry, stat_result)
 
     def check_index_against_head_tree(self, entry: Entry) -> None:
         item = self.head_tree.get(entry.path, None)
-        if item is not None:
-            if entry.mode() != item.mode or entry.oid != item.oid:
-                self.record_change(entry.path, self.index_changes, "modified")
-        else:
-            self.record_change(entry.path, self.index_changes, "added")
+        status = self.inspector.compare_tree_to_index(item, entry)
 
+        if status is not None:
+            self.record_change(entry.path, self.index_changes, status)
+            
     def record_change(self, path: Path, structure: MutableMapping[str, str], ty: str) -> None:
         self.changed.add(str(path))
         structure[str(path)] = ty
@@ -117,12 +98,12 @@ class Status:
     def scan_workspace(self, prefix: str = '') -> None:
         for path, stat in self.repo.workspace.list_dir(prefix).items():
             if self.repo.index.is_tracked(path):
-                if self._is_dir(stat):
+                if self.inspector._is_dir(stat):
                     self.scan_workspace(str(path))
-                elif self._is_file(stat):
+                elif self.inspector._is_file(stat):
                     self.stats[path] = stat
-            elif self._is_trackable_file(path, stat):
-                if self._is_dir(stat):
+            elif self.inspector._is_trackable_file(path, stat):
+                if self.inspector._is_dir(stat):
                     self.untracked.add(f"{path}{os.sep}")
                 else:
                     self.untracked.add(str(path))
@@ -153,27 +134,4 @@ class Status:
         else:
             self.record_change(entry.path, self.workspace_changes, "modified")
 
-    def _is_trackable_file(self, path: Path, stat: os.stat_result) -> bool:
-        if self._is_file(stat):
-            return not self.repo.index.is_tracked(path)
-        
-        if not self._is_dir(stat):
-            return False
-        
-        items = self.repo.workspace.list_dir(str(path))
-        files = [(k, v) for k, v in items.items() if self._is_file(v)]
-        dirs = [(k, v) for k, v in items.items() if self._is_dir(v)]
 
-        for x in (files, dirs):
-            for child_path, child_stat in x:
-                if self._is_trackable_file(child_path, child_stat):
-                    return True
-
-        return False
-
-    
-    def _is_file(self, stat_result: os.stat_result) -> bool:
-        return stat.S_ISREG(stat_result.st_mode)
-
-    def _is_dir(self, stat_result: os.stat_result) -> bool:
-        return stat.S_ISDIR(stat_result.st_mode)

@@ -19,7 +19,7 @@ def setup_and_teardown(repo_path):
     Initialize a repository before each test and clean up afterward.
     """
     # initialize repository (e.g., `init` command)
-    Command.execute(repo_path, {}, ["init"], StringIO(), StringIO(), StringIO())
+    Command.execute(repo_path, {}, [""] + ["init"], StringIO(), StringIO(), StringIO())
     yield
     # teardown: remove the repo directory
     shutil.rmtree(repo_path, ignore_errors=True)
@@ -145,6 +145,10 @@ def assert_stderr(stderr, expected):
     stderr.seek(0)
     data = stderr.read()
     assert data == expected, f"Expected stderr {expected!r}, got {data!r}"
+
+def assert_noent(repo_path, filename: str):
+    target_path = repo_path / filename
+    assert not target_path.exists(), f"Expected path '{target_path}' to not exist, but it does."
 
 @pytest.fixture
 def committed_repo(write_file, legit_cmd, commit):

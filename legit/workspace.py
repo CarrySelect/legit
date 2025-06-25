@@ -34,21 +34,42 @@ class Workspace:
         self.apply_change_list(migration, "update")
 
         self.apply_change_list(migration, "create")
-    
+      
+    def _rm_rf(self, path: Path) -> None:
+       try:
+           if path.is_dir():
+               shutil.rmtree(path)
+           else:
+               path.unlink()
+       except (FileNotFoundError, NotADirectoryError):
+           pass
+
     def apply_change_list(self, migration: Migration, action: str) -> None:
         for filename, entry in migration.changes[action]:
             path = self.path / filename
 
-            shutil.rmtree(path, ignore_errors=True)
+            self._rm_rf(path)
 
             if action == "delete":
                 continue
+            
+            p = path.parent
 
-            data = migration.blob_data(entry.oid)  # bytes
-            with path.open("xb") as fh:
-                fh.write(data)
+            while p != self.path and p.exists() and p.is_file():
+                p.unlink()
+                p = p.parent
+            
+            path.parent.mkdir(parents=True, exist_ok=True)
 
-            os.chmod(path, entry.mode)
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            
+            if entry.is_tree():
+                self.make_directory(filename)
+            else:
+                data = migration.blob_data(entry.oid)
+                with os.fdopen(os.open(path, flags, 0o644), "wb+") as f:
+                    f.write(data.encode('utf-8'))
+                path.chmod(entry.mode)
 
 
     def remove_directory(self, dirname: Path) -> None:
@@ -56,12 +77,11 @@ class Workspace:
 
     def make_directory(self, dirname: Path) -> None:
         path = self.path / dirname
-        stat = dirname.stat()
 
         if path.is_file():
             path.unlink()
-        elif not path.is_dir():
-            path.mkdir(exist_ok=True, parents=True)
+
+        path.mkdir(exist_ok=True, parents=True)
 
     def list_files(self, path: Path) -> Iterator[Path]:
         if path.is_dir():
@@ -99,6 +119,8 @@ class Workspace:
     def stat_file(self, path: Path) -> os.stat_result:
         try:
             return (self.path / path).stat()
+        except FileNotFoundError:
+            return None
         except PermissionError:
             raise Workspace.NoPermission(f"stat(\"{path.name}\"): Permission denied")
 

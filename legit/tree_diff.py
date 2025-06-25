@@ -21,20 +21,16 @@ class TreeDiff:
     def compare_oids(self, a: Optional[str], b: Optional[str], prefix: Path = Path()) -> None:
         if a == b:
             return
-
-        a_tree = self.oid_to_tree(a)
-        assert a_tree is not None
-        a_entries = cast(dict[Path, DatabaseEntry], a_tree.entries if a is not None else {})
-
-        b_tree = self.oid_to_tree(b)
-        assert b_tree is not None
-        b_entries = cast(dict[Path, DatabaseEntry], b_tree.entries if b is not None else {})
+        
+        a_entries = self.oid_to_tree(a).entries if a else {}
+        b_entries = self.oid_to_tree(b).entries if b else {}
 
         self.detect_deletions(a_entries, b_entries, prefix)
         self.detect_additions(a_entries, b_entries, prefix)
 
     def oid_to_tree(self, oid: Optional[str]) -> Optional[Tree]:
-        assert oid is not None
+        if oid is None:
+            return None
 
         obj = self.database.load(oid)
 

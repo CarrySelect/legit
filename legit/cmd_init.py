@@ -16,7 +16,7 @@ class Init(Base):
 
     def run(self) -> None:
         if self.args:
-            root_path = Path(self.args[1]).absolute()
+            root_path = Path(self.args[0]).absolute()
         else:
             root_path = Path(self.dir).absolute()
             

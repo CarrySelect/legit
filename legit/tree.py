@@ -13,6 +13,14 @@ class DatabaseEntry:
     def is_tree(self) -> bool:
         return self.mode == DatabaseEntry.TREE_MODE
 
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, DatabaseEntry):
+            return NotImplemented
+        return (
+            self.oid  == other.oid  and
+            self.mode == other.mode and
+            self.is_tree() == other.is_tree()
+        )
 class Tree:
     def __init__(self, entries: MutableMapping[str, 'DatabaseEntry | Entry | Tree'] | None = None) -> None:
         self.entries: MutableMapping[str, DatabaseEntry | Entry | Tree] = (

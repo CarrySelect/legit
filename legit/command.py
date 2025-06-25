@@ -12,6 +12,7 @@ from legit.cmd_commit import Commit
 from legit.cmd_status import StatusCmd
 from legit.cmd_diff import Diff
 from legit.cmd_branch import Branch
+from legit.cmd_checkout import Checkout
 
 
 class Command:
@@ -25,6 +26,7 @@ class Command:
         "status": StatusCmd,
         "diff": Diff,
         "branch": Branch,
+        "checkout": Checkout,
     }
 
     @staticmethod
