@@ -99,7 +99,6 @@ class Refs:
                 refs.append(Refs.SymRef(self, str(rel_path)))
         return refs
 
-
     def current_ref(self, source: str = "HEAD") -> 'Refs.SymRef':
         ref = self.read_oid_or_symref(self.path / source)
 
@@ -116,6 +115,7 @@ class Refs:
             relative = path.relative_to(self.path)
             self._update_ref_file(head, f"ref: {relative}")
         else:
+            print(f"calling _update_ref_file with oid: {oid}")
             self._update_ref_file(head, oid)
 
     def read_oid_or_symref(self, path: Path) -> Optional['Refs.Ref | Refs.SymRef']:
@@ -135,11 +135,11 @@ class Refs:
             case c if isinstance(c, Refs.SymRef):
                 assert isinstance(ref, Refs.SymRef)
                 return self.read_symref(self.path / ref.path)
-            case c if c is None:
-                return None
 
     def read_head(self) -> Optional[str]:
-        return self.read_symref(self.path / Refs.HEAD)
+        head = self.read_symref(self.path / Refs.HEAD)
+        print(f"head is: {head}")
+        return head
 
     def update_head(self, oid: str) -> None:
         self.update_symref(self.path / Refs.HEAD, oid)
@@ -150,6 +150,7 @@ class Refs:
 
         ref = self.read_oid_or_symref(path)
         if not isinstance(ref, Refs.SymRef):
+            print(f"update_symref: {oid=}")
             self.write_lockfile(lockfile, oid)
             return
 
@@ -159,9 +160,7 @@ class Refs:
             lockfile.rollback()
 
     def write_lockfile(self, lockfile: Lockfile, oid: Optional[str]) -> None:
-        if oid is None:
-            return
-
+        assert oid is not None
         lockfile.write(oid.encode('utf-8') + b'\n')
         lockfile.commit()
 
@@ -172,6 +171,8 @@ class Refs:
         path = self.heads_path / branch_name
         if path.is_file():
             raise Refs.InvalidBranch(f"A branch named {branch_name} already exists.")
+    
+        print(f"{start_oid=}")
 
         return self._update_ref_file(path, start_oid)
 
@@ -180,6 +181,7 @@ class Refs:
         
         try:
             lockfile.hold_for_update()
+            print(f"_update_ref_file: {oid=}")
             self.write_lockfile(lockfile, oid)
         except FileNotFoundError:
             path.parent.mkdir(parents=True, exist_ok=True)

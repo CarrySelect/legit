@@ -21,9 +21,9 @@ class Init(Base):
 
     def run(self) -> None:
         if self.args:
-            root_path = Path(self.args[0]).absolute()
+            root_path = Path(self.args[0]).absolute().resolve()
         else:
-            root_path = Path(self.dir).absolute()
+            root_path = Path(self.dir).absolute().resolve()
             
         git_path: Path = root_path / ".git"
 

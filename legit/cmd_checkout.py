@@ -41,7 +41,7 @@ class Checkout(Base):
             self.handle_invalid_object(revision, e)
 
         self.repo.index.load_for_update()
-        
+
         tree_diff = self.repo.database.tree_diff(self.current_oid, self.target_oid)
         migration = self.repo.migration(cast(dict[Path, list[DatabaseEntry]], tree_diff))
         
@@ -81,7 +81,7 @@ class Checkout(Base):
     def print_previous_head(self) -> None:
         assert self.current_oid is not None
         if self.current_ref.is_head() and self.current_oid != self.target_oid:
-            self.print_head_position("Previous HEAD was", self.current_oid)
+            self.print_head_position("Previous HEAD position was", self.current_oid)
 
     def print_head_position(self, msg: str, oid: str) -> None:
         commit = self.repo.database.load(oid)
@@ -93,7 +93,7 @@ class Checkout(Base):
 
     def print_detachment_notice(self) -> None:
         assert self.current_ref is not None
-        if not (self.new_ref.is_head() and not self.current_ref.is_head()):
+        if not self.new_ref.is_head() and not self.current_ref.is_head():
             return
 
         self.stderr.write(f"Note: checking out '{self.target}'.\n")

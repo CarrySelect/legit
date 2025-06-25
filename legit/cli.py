@@ -16,6 +16,9 @@ def run_cmd(cmd_name: str, *args: str) -> None:
     from legit.command import Command
 
     argv: list[str] = ["legit", cmd_name, *args]
+    
+    print(f"argv is {argv}")
+
     cmd: Base = Command.execute(
         Path.cwd(),
         os.environ.copy(),

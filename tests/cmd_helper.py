@@ -19,7 +19,7 @@ def setup_and_teardown(repo_path):
     Initialize a repository before each test and clean up afterward.
     """
     # initialize repository (e.g., `init` command)
-    Command.execute(repo_path, {}, [""] + ["init"], StringIO(), StringIO(), StringIO())
+    Command.execute(repo_path, {}, ["legit", "init"], StringIO(), StringIO(), StringIO())
     yield
     # teardown: remove the repo directory
     shutil.rmtree(repo_path, ignore_errors=True)
@@ -128,7 +128,7 @@ def legit_cmd(repo_path):
         stdin = StringIO(stdin_data)
         stdout = StringIO()
         stderr = StringIO()
-        cmd = Command.execute(repo_path, env, [""] + list(argv), stdin, stdout, stderr)
+        cmd = Command.execute(repo_path, env, ["legit"] + list(argv), stdin, stdout, stderr)
         return cmd, stdin, stdout, stderr
     return _legit_cmd
 

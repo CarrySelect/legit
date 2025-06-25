@@ -23,10 +23,9 @@ class Database:
         self.path: Path = path
         self.objects: MutableMapping[str, Blob | Commit | Tree] = {}
 
-    def tree_diff(self, a: Optional[str], b: Optional[str]) -> dict[Path, list[Optional[DatabaseEntry]]]:
+    def tree_diff(self, a: str, b: str) -> dict[Path, list[Optional[DatabaseEntry]]]:
         diff = TreeDiff(self)
         diff.compare_oids(a, b)
-        print(diff.changes)
         return diff.changes
 
     def load(self, oid: str) -> Blob | Commit | Tree:

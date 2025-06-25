@@ -21,7 +21,7 @@ from tests.cmd_helper import *
 
 
 @pytest.fixture(autouse=True)
-def repo_with_initial_commit(repo_path, commit_all, write_file, base_files, legit_cmd):
+def repo_with_initial_commit(setup_and_teardown, repo_path, commit_all, write_file, base_files, legit_cmd):
     """
     Creates a repository with the base_files committed.
     """

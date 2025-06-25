@@ -95,7 +95,9 @@ class Revision:
 
     def resolve(self, ty: Optional[str] = None) -> Optional[str]:
         assert self.query is not None
+        print(f"type of resolved object is: {ty=}")
         oid = self.query.resolve(self)
+        print(f"oid of resolved object is: {oid=}")
         if ty is not None and not self.load_typed_object(oid, ty):
             return None
         if oid is not None:
@@ -139,15 +141,14 @@ class Revision:
         return None
     
     def commit_parent(self, oid: str | None) -> Optional[str]:
+        print(f"commit_parent: {oid=}")
         if oid is None:
             return None
 
         assert oid is not None
 
         commit = self.load_typed_object(oid, Revision.COMMIT)
-        assert isinstance(commit, Commit)
-        
-        return commit.parent
+        return commit.parent if commit is not None and isinstance(commit, Commit) else None        
     
     def load_typed_object(self, oid: Optional[str], ty: str) -> Optional['Tree | Commit | Blob']:
         if oid is None:
@@ -168,6 +169,7 @@ class Revision:
             return oid
 
         candidates = self.repo.database.prefix_match(name)
+            
         if len(candidates) > 1:
             self.log_ambiguous_sha1(name, candidates)
 

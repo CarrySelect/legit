@@ -28,7 +28,6 @@ class Status:
         self.workspace_changes: MutableMapping[str, str] = {}
         self.changed: set[str] = set()
         self.untracked: set[str] = set()
-        self.head_tree: MutableMapping[Path, DatabaseEntry] = {}
 
         self.scan_workspace()
         self.load_head_tree()
@@ -41,15 +40,15 @@ class Status:
                 self.record_change(path, self.index_changes, "deleted")
 
     def load_head_tree(self) -> None:
-        try:
-            head_oid = self.repo.refs.read_head()
-        except FileNotFoundError:
-            head_oid = None
+        self.head_tree: dict[Path, DatabaseEntry] = {}
+        
+        head_oid = self.repo.refs.read_head()
+        if head_oid is None:
             return
 
-        assert head_oid is not None
         commit = self.repo.database.load(head_oid)
         assert isinstance(commit, Commit)
+
         self.read_tree(commit.tree)
 
     def read_tree(self, tree_oid: str, pathname: str ='') -> None:
