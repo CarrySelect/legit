@@ -93,7 +93,7 @@ class Checkout(Base):
 
     def print_detachment_notice(self) -> None:
         assert self.current_ref is not None
-        if not self.new_ref.is_head() and not self.current_ref.is_head():
+        if not (self.new_ref.is_head() and not self.current_ref.is_head()):
             return
 
         self.stderr.write(f"Note: checking out '{self.target}'.\n")

@@ -621,3 +621,102 @@ def test_maintains_index_modifications(write_file, commit_all, legit_cmd, repo_p
     assert_workspace(repo_path, expected)
     assert_status(legit_cmd, "M  outer/2.txt\nA  outer/inner/4.txt\n")
 
+@pytest.fixture
+def repo_with_chain(setup_and_teardown, repo, write_file, commit, legit_cmd):
+    # Create a chain of three commits: “first”, “second”, “third”
+    for msg in ["first", "second", "third"]:
+        write_file("file.txt", msg)
+        legit_cmd("add", ".")
+        commit(msg)
+    # Create branches “topic” at HEAD (third) and “second” at HEAD^ (second)
+    legit_cmd("branch", "topic")
+    legit_cmd("branch", "second", "@^")
+    return repo
+
+def test_links_HEAD_to_branch(repo_with_chain, legit_cmd, repo):
+    legit_cmd("checkout", "topic")
+    assert repo.refs.current_ref().path == "refs/heads/topic"
+
+def test_resolves_HEAD_to_same_object_as_branch(repo_with_chain, legit_cmd, repo):
+    legit_cmd("checkout", "topic")
+    assert repo.refs.read_ref("topic") == repo.refs.read_head()
+
+def test_prints_message_when_switching_to_same_branch(repo_with_chain, legit_cmd):
+    legit_cmd("checkout", "topic")
+    _, _stdin, _stdout, stderr = legit_cmd("checkout", "topic")
+    stderr.seek(0)
+    assert stderr.read() == "Already on 'topic'\n"
+
+def test_prints_message_when_switching_to_another_branch(repo_with_chain, legit_cmd):
+    legit_cmd("checkout", "topic")
+    _, _stdin, _stdout, stderr = legit_cmd("checkout", "second")
+    stderr.seek(0)
+    assert stderr.read() == "Switched to branch 'second'\n"
+
+def test_prints_warning_when_detaching_HEAD(repo_with_chain, legit_cmd, repo):
+    legit_cmd("checkout", "topic")
+    _, _stdin, _stdout, stderr = legit_cmd("checkout", "@")
+    stderr.seek(0)
+    short = repo.database.short_oid(repo.refs.read_head())
+    expected = textwrap.dedent(f"""\
+        Note: checking out '@'.
+
+        You are in 'detached HEAD' state. You can look around, make experimental
+        changes and commit them, and you can discard any commits you make in this
+        state without impacting any branches by performing another checkout.
+
+        If you want to create a new branch to retain commits you create, you may
+        do so (now or later) by using the branch command. Example:
+
+            legit branch <new-branch-name>
+
+        HEAD is now at {short} third
+        """)
+    assert stderr.read() == expected
+
+def test_detaches_HEAD_on_relative_revision(repo_with_chain, legit_cmd, repo):
+    _, _stdin, _stdout, stderr = legit_cmd("checkout", "topic^")
+    assert repo.refs.current_ref().path == "HEAD"
+
+def test_puts_revision_value_in_HEAD(repo_with_chain, legit_cmd, repo):
+    _, _stdin, _stdout, stderr = legit_cmd("checkout", "topic^")
+    # “topic^” resolves to the second commit
+    from legit.revision import Revision
+    expected_oid = Revision(repo, "topic^").resolve()
+    assert repo.refs.read_head() == expected_oid
+
+def test_prints_message_when_switching_to_same_commit(repo_with_chain, legit_cmd, repo):
+    legit_cmd("checkout", "topic^")
+    short = repo.database.short_oid(repo.refs.read_head())
+    _, _stdin, _stdout, stderr = legit_cmd("checkout", "@")
+    stderr.seek(0)
+    assert stderr.read() == f"HEAD is now at {short} second\n"
+
+def test_prints_message_when_switching_to_different_commit(repo_with_chain, legit_cmd, repo):
+    # first go to topic^ (second), then back to topic^^ (first)
+    legit_cmd("checkout", "topic^")
+    a = repo.database.short_oid(repo.refs.read_head())
+    _, _stdin, _stdout, stderr = legit_cmd("checkout", "topic^^")
+    b = repo.database.short_oid(repo.refs.read_head())
+    stderr.seek(0)
+    assert stderr.read() == textwrap.dedent(f"""\
+        Previous HEAD position was {a} second
+        HEAD is now at {b} first
+        """)
+
+def test_prints_message_when_switching_to_branch_with_same_ID(repo_with_chain, legit_cmd, repo):
+    # from a detached HEAD at the second commit, checkout “second” branch which points there
+    legit_cmd("checkout", "topic^")
+    _, _stdin, _stdout, stderr = legit_cmd("checkout", "second")
+    stderr.seek(0)
+    assert stderr.read() == "Switched to branch 'second'\n"
+
+def test_prints_message_when_switching_to_branch_from_detached(repo_with_chain, legit_cmd, repo):
+    legit_cmd("checkout", "topic^")
+    short = repo.database.short_oid(repo.refs.read_head())
+    _, _stdin, _stdout, stderr = legit_cmd("checkout", "topic")
+    stderr.seek(0)
+    assert stderr.read() == textwrap.dedent(f"""\
+        Previous HEAD position was {short} second
+        Switched to branch 'topic'
+        """)
