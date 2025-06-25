@@ -52,7 +52,7 @@ class Inspector:
 
     def _is_trackable_file(self, path: Path, stat: os.stat_result) -> bool:
         if self._is_file(stat):
-            return not self.repo.index.is_tracked(path)
+            return not self.repo.index.is_tracked_file(path)
         
         if not self._is_dir(stat):
             return False
