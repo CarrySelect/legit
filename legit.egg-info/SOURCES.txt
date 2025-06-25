@@ -1,8 +1,8 @@
 pyproject.toml
 legit/__init__.py
-legit/__main__.py
 legit/author.py
 legit/blob.py
+legit/cli.py
 legit/cmd_add.py
 legit/cmd_base.py
 legit/cmd_branch.py
