@@ -214,7 +214,6 @@ class Migration:
             raise self.Conflict
 
     def update_workspace(self) -> None:
-        print(f"Applying: {self.changes}")
         self.repo.workspace.apply_migration(self)
 
     def update_index(self) -> None:

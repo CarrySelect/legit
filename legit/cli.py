@@ -17,8 +17,6 @@ def run_cmd(cmd_name: str, *args: str) -> None:
 
     argv: list[str] = ["legit", cmd_name, *args]
     
-    print(f"argv is {argv}")
-
     cmd: Base = Command.execute(
         Path.cwd(),
         os.environ.copy(),
@@ -90,13 +88,34 @@ def diff_cmd(cached: bool) -> None:
 
 
 @cli.command()
-@click.argument("name", required=False)
-@click.argument("start", required=False)
-def branch(name: str | None, start: str | None) -> None:
-    """Create *NAME* at *START* (defaults to HEAD)."""
-
-    run_cmd("branch", *(name, start,) if start and name else ())
-
+@click.option('-v', '--verbose', is_flag=True, help='Show verbose branch output')
+@click.option('-d', '--delete', 'delete', is_flag=True, help='Delete a branch')
+@click.option('-f', '--force', 'force', is_flag=True, help='Force delete a branch')
+@click.option('-D', 'D', is_flag=True, help='Shortcut for --delete --force')
+@click.argument('name', required=False)
+@click.argument('start', required=False)
+def branch(verbose: bool, delete: bool, force: bool, D: bool, name: str | None, start: str | None) -> None:
+    """List, create, or delete branches."""
+    flags = []
+    if verbose:
+        flags.append('-v')
+    if delete or D:
+        flags.append('-d')
+    if force or D:
+        flags.append('-f')
+    if D and not (delete and force):
+        # If -D used alone, ensure both delete and force get set
+        flags = [f for f in flags if f not in ('-d', '-f')]
+        flags.extend(['-D'])
+    
+    # Build positional args
+    args = []
+    if name:
+        args.append(name)
+    if start:
+        args.append(start)
+    
+    run_cmd('branch', *flags, *args)
 
 @cli.command()
 @click.argument("target")

@@ -98,8 +98,16 @@ class Database:
         dirname = object_path.parent
 
         oids = []
-        for filename in dirname.iterdir():
-            oids.append(f"{dirname.name}{filename}")
+        
+        try:
+            files = dirname.iterdir()
+        except FileNotFoundError:
+            return []
+
+        for filename in files:
+            oids.append(f"{dirname.name}{filename.name}")
+
+        print(f"{oids=}")
 
         return [oid for oid in oids if oid.startswith(name)]
 

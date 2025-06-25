@@ -115,7 +115,6 @@ class Refs:
             relative = path.relative_to(self.path)
             self._update_ref_file(head, f"ref: {relative}")
         else:
-            print(f"calling _update_ref_file with oid: {oid}")
             self._update_ref_file(head, oid)
 
     def read_oid_or_symref(self, path: Path) -> Optional['Refs.Ref | Refs.SymRef']:
@@ -138,7 +137,6 @@ class Refs:
 
     def read_head(self) -> Optional[str]:
         head = self.read_symref(self.path / Refs.HEAD)
-        print(f"head is: {head}")
         return head
 
     def update_head(self, oid: str) -> None:
@@ -150,7 +148,6 @@ class Refs:
 
         ref = self.read_oid_or_symref(path)
         if not isinstance(ref, Refs.SymRef):
-            print(f"update_symref: {oid=}")
             self.write_lockfile(lockfile, oid)
             return
 
@@ -170,10 +167,8 @@ class Refs:
         
         path = self.heads_path / branch_name
         if path.is_file():
-            raise Refs.InvalidBranch(f"A branch named {branch_name} already exists.")
+            raise Refs.InvalidBranch(f"A branch named '{branch_name}' already exists.")
     
-        print(f"{start_oid=}")
-
         return self._update_ref_file(path, start_oid)
 
     def _update_ref_file(self, path: Path, oid: str) -> str:
@@ -181,7 +176,6 @@ class Refs:
         
         try:
             lockfile.hold_for_update()
-            print(f"_update_ref_file: {oid=}")
             self.write_lockfile(lockfile, oid)
         except FileNotFoundError:
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -206,4 +200,37 @@ class Refs:
             return path.read_text().strip()
         except FileNotFoundError:
             return None
-        
+
+    def delete_branch(self, branch_name: str) -> str:
+        path = self.heads_path / branch_name
+        lock = Lockfile(path)
+
+        try:
+            # Acquire exclusive lock before touching the file
+            lock.hold_for_update()
+
+            # Read the branch’s current SHA (or symref)
+            oid = self.read_symref(path)
+            if not oid:
+                raise Refs.InvalidBranch(f"branch '{branch_name}' not found.")
+
+            # Remove the ref file and then prune empty parent dirs
+            path.unlink()
+            self._delete_parent_directories(path)
+
+            return oid
+
+        finally:
+            # Always roll back the lock (releases it or cleans up)
+            lock.rollback()
+
+    def _delete_parent_directories(self, path: Path) -> None:
+        """
+        Walk up from `path.parent` and remove any empty directories,
+        stopping once we hit `self.heads_path`.
+        """
+        p = path.parent
+        while p != self.heads_path and p.exists() and not any(p.iterdir()):
+            p.rmdir()
+            p = p.parent
+

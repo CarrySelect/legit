@@ -93,16 +93,18 @@ class Revision:
         self.query: Optional[Union['Revision.Ref', 'Revision.Parent', 'Revision.Ancestor']] = Revision.parse(self.expr)
         self.errors: list[HintedError] = []
 
-    def resolve(self, ty: Optional[str] = None) -> Optional[str]:
-        assert self.query is not None
-        print(f"type of resolved object is: {ty=}")
-        oid = self.query.resolve(self)
-        print(f"oid of resolved object is: {oid=}")
-        if ty is not None and not self.load_typed_object(oid, ty):
-            return None
+
+    def resolve(self, ty: Optional[str] = None) -> str:
+        oid = self.query.resolve(self) if self.query is not None else None
+
+        if oid is not None and ty is not None:
+            if not self.load_typed_object(oid, ty):
+                oid = None
+
         if oid is not None:
             return oid
-        raise Revision.InvalidObject(f"Not a valid object name: {self.expr}")
+        
+        raise Revision.InvalidObject(f"Not a valid object name: '{self.expr}'.")
 
     @classmethod
     def valid_ref(cls, revision: str) -> bool:
@@ -141,7 +143,6 @@ class Revision:
         return None
     
     def commit_parent(self, oid: str | None) -> Optional[str]:
-        print(f"commit_parent: {oid=}")
         if oid is None:
             return None
 
@@ -167,9 +168,16 @@ class Revision:
         oid = self.repo.refs.read_ref(name)
         if oid is not None:
             return oid
+        
+        print(f"name is {name}")
+        print(f"oid is {oid}")
 
         candidates = self.repo.database.prefix_match(name)
-            
+
+        print(f"candidates is {candidates}")
+        if len(candidates) == 1:
+            return candidates[0]
+
         if len(candidates) > 1:
             self.log_ambiguous_sha1(name, candidates)
 
@@ -184,7 +192,7 @@ class Revision:
         for oid in sorted(candidates):
             obj = self.repo.database.load(oid)
             short = self.repo.database.short_oid(obj.oid)
-            info = f"  {short} {obj.type}"
+            info = f"  {short} {obj.type()}"
             
             if obj.type() == "commit":
                 assert isinstance(obj, Commit)
