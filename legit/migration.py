@@ -75,11 +75,7 @@ class Migration:
 
     @staticmethod
     def _ancestor_dirs(p: Path) -> List[Path]:
-        """
-        Equivalent to Ruby Pathname#dirname#descend:
-        return parents shallow-to-deep (``a/``, ``a/b/`` …).
-        """
-        return list(reversed([parent for parent in p.parents if parent != Path('.')]))
+         return list(reversed([parent for parent in p.parents if parent != Path(".")]))
 
     def record_change(self, path: Path, old_item, new_item) -> None:
         """Populate *changes*, *mkdirs*, and *rmdirs* like the Ruby method."""

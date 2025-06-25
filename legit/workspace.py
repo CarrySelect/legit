@@ -73,7 +73,10 @@ class Workspace:
 
 
     def remove_directory(self, dirname: Path) -> None:
-        shutil.rmtree(self.path / dirname, ignore_errors=True)
+        try:
+            os.rmdir(self.path / dirname)
+        except OSError:
+            pass
 
     def make_directory(self, dirname: Path) -> None:
         path = self.path / dirname

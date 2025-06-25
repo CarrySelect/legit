@@ -430,7 +430,7 @@ def test_leaves_an_unindexed_directory_deleted(write_file, delete, commit_all, l
             "outer/2.txt": "2",
         },
     )
-    assert_status(legit_cmd, "D outer/inner/3.txt\n")
+    assert_status(legit_cmd, "D  outer/inner/3.txt\n")
 
 
 def test_fails_to_remove_with_a_file_at_a_parent_path(write_file, delete, commit_all, legit_cmd):
