@@ -32,7 +32,7 @@ class Diff(Base):
         
         self.setup_pager()
 
-        if len(self.args) > 0 and self.args[0] == '--cached':
+        if len(self.args) > 0 and self.args[0] in {'--cached', '--staged'}:
             self.diff_head_index()
         else:
             self.diff_index_workspace()

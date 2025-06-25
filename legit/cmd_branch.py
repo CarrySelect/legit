@@ -7,8 +7,45 @@ from legit.revision import Revision
 class Branch(Base):
     def run(self) -> None:
         self.repo = Repository(self.dir / ".git")
-        self.create_branch()
+
+        if any(x in self.args for x in {'-v', '-vv', '-vvv', '--verbose'}):
+            self.verbose = True
+        else:
+            self.verbose = False
+
+        if not self.args:
+            self.list_branches()
+        else:
+            self.create_branch()
         self.exit(0)
+
+    def list_branches(self) -> None:
+        current = self.repo.refs.current_ref()
+        branches = sorted(self.repo.refs.list_branches(), key=lambda ref: ref.path)
+        max_width = max((len(b.short_name()) for b in branches), default=0)
+
+        self.setup_pager()
+
+        for ref in branches:
+            info = self.format_ref(ref, current)
+            info += self.extended_branch_info(ref, max_width)
+            self.println(info)
+
+    def format_ref(self, ref, current) -> str:
+        if ref == current:
+            return f"* {self.fmt('green', ref.short_name())}"
+        else:
+            return f"  {ref.short_name()}"
+
+    def extended_branch_info(self, ref, max_width) -> str:
+        if not self.verbose:
+            return ''
+
+        commit = self.repo.database.load(ref.read_oid())
+        short = self.repo.database.short_oid(commit.oid)
+        space = ' ' * (max_width - len(ref.short_name()))
+
+        return f"{space} {short} {commit.title_line()}"
 
     def create_branch(self) -> None:
         branch_name = self.args[0]

@@ -29,6 +29,14 @@ class Refs:
         def read_oid(self) -> str:
             return self.oid
 
+        def __eq__(self, other: object) -> bool:
+            if not isinstance(other, Refs.Ref):
+                return NotImplemented
+            return self.oid == other.oid
+
+        def __hash__(self) -> int:
+            return hash(self.oid)
+
     class SymRef:
         def __init__(self, refs: 'Refs', path: str) -> None:
             self.path: str = path
@@ -40,6 +48,17 @@ class Refs:
         def is_head(self) -> bool:
             return self.path == Refs.HEAD
 
+        def short_name(self) -> str:
+            return self.refs.short_name(self.path)
+    
+        def __eq__(self, other: object) -> bool:
+            if not isinstance(other, Refs.SymRef):
+                return NotImplemented
+            return self.refs is other.refs and self.path == other.path
+
+        def __hash__(self) -> int:
+            return hash((id(self.refs), self.path))
+
     HEAD = "HEAD"
     SYMREF = re.compile(r"^ref: (.+)$")
 
@@ -47,6 +66,39 @@ class Refs:
         self.path: Path = path
         self.refs_path: Path = self.path / "refs"
         self.heads_path: Path = self.refs_path / "heads"
+
+    def short_name(self, p: str) -> str:
+        path = self.path / p
+
+        prefix = None
+        for candidate in (self.heads_path, self.path):
+           if any(parent == candidate for parent in (path.parent, *path.parent.parents)):
+                prefix = candidate
+                break
+
+        if prefix is None:
+            prefix = self.path
+
+        return str(path.relative_to(prefix))
+
+    def list_branches(self) -> list['Refs.SymRef']:
+        return self.list_refs(self.heads_path)
+
+    def list_refs(self, dirname: Path) -> list['Refs.SymRef']:
+        try:
+            entries = list(dirname.iterdir())
+        except FileNotFoundError:
+            return []
+
+        refs: list["Refs.SymRef"] = []
+        for path in entries:
+            if path.is_dir():
+                refs.extend(self.list_refs(path))
+            else:
+                rel_path = path.relative_to(self.path)
+                refs.append(Refs.SymRef(self, str(rel_path)))
+        return refs
+
 
     def current_ref(self, source: str = "HEAD") -> 'Refs.SymRef':
         ref = self.read_oid_or_symref(self.path / source)
@@ -106,7 +158,10 @@ class Refs:
         finally:
             lockfile.rollback()
 
-    def write_lockfile(self, lockfile: Lockfile, oid: str) -> None:
+    def write_lockfile(self, lockfile: Lockfile, oid: Optional[str]) -> None:
+        if oid is None:
+            return
+
         lockfile.write(oid.encode('utf-8') + b'\n')
         lockfile.commit()
 

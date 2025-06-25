@@ -79,7 +79,7 @@ def status(porcelain: bool) -> None:
 
 
 @cli.command(name="diff")
-@click.option("--cached", is_flag=True, help="Compare index with HEAD.")
+@click.option("--cached", "--staged", is_flag=True, help="Compare index with HEAD.")
 def diff_cmd(cached: bool) -> None:
     """Show changes between index/HEAD or index/worktree."""
 
@@ -87,12 +87,12 @@ def diff_cmd(cached: bool) -> None:
 
 
 @cli.command()
-@click.argument("name")
+@click.argument("name", required=False)
 @click.argument("start", required=False)
-def branch(name: str, start: str | None) -> None:
+def branch(name: str | None, start: str | None) -> None:
     """Create *NAME* at *START* (defaults to HEAD)."""
 
-    run_cmd("branch", name, *(start,) if start else ())
+    run_cmd("branch", *(name, start,) if start and name else ())
 
 
 @cli.command()

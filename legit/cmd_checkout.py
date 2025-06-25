@@ -42,8 +42,6 @@ class Checkout(Base):
 
         self.repo.index.load_for_update()
         
-        assert self.target_oid is not None
-        assert self.current_oid is not None
         tree_diff = self.repo.database.tree_diff(self.current_oid, self.target_oid)
         migration = self.repo.migration(cast(dict[Path, list[DatabaseEntry]], tree_diff))
         
