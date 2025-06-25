@@ -1,6 +1,11 @@
 from pathlib import Path
 from legit.cmd_base import Base
 from typing import MutableMapping, TextIO
+from legit.refs import Refs
+
+
+DEFAULT_BRANCH = "master"
+
 
 class Init(Base):
     def __init__(
@@ -22,11 +27,15 @@ class Init(Base):
             
         git_path: Path = root_path / ".git"
 
-        for d in ("objects", "refs"):
+        for d in ("objects", "refs/heads"):
             try:
                 (git_path / d).mkdir(parents=True, exist_ok=True)
             except PermissionError as e:
                 self.stderr.write(f"fatal: {e.strerror}")
                 self.exit(1)
+    
+        refs = Refs(git_path)
+        path = f"refs/heads/{DEFAULT_BRANCH}"
+        refs.update_head(f"ref: {path}")
 
         self.println(f"Initialized empty Legit repository in {git_path}")

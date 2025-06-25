@@ -74,9 +74,8 @@ class Refs:
         m = Refs.SYMREF.match(data)
         return Refs.SymRef(self, m.group(1)) if m else Refs.Ref(data)
 
-    def read_symref(self, path: Path) -> str:
+    def read_symref(self, path: Path) -> Optional[str]:
         ref = self.read_oid_or_symref(Path(path))
-        assert ref is not None
         match ref:
             case c if isinstance(c, Refs.Ref):
                 assert isinstance(ref, Refs.Ref)
@@ -84,14 +83,32 @@ class Refs:
             case c if isinstance(c, Refs.SymRef):
                 assert isinstance(ref, Refs.SymRef)
                 return self.read_symref(self.path / ref.path)
-            case _:
-                raise NotImplemented
+            case c if c is None:
+                return None
 
-    def read_head(self) -> str:
+    def read_head(self) -> Optional[str]:
         return self.read_symref(self.path / Refs.HEAD)
 
     def update_head(self, oid: str) -> None:
-        self._update_ref_file(self.path / Refs.HEAD, oid)
+        self.update_symref(self.path / Refs.HEAD, oid)
+
+    def update_symref(self, path: Path, oid: str) -> None:
+        lockfile = Lockfile(path)
+        lockfile.hold_for_update()
+
+        ref = self.read_oid_or_symref(path)
+        if not isinstance(ref, Refs.SymRef):
+            self.write_lockfile(lockfile, oid)
+            return
+
+        try:
+            self.update_symref(self.path / ref.path, oid)
+        finally:
+            lockfile.rollback()
+
+    def write_lockfile(self, lockfile: Lockfile, oid: str) -> None:
+        lockfile.write(oid.encode('utf-8') + b'\n')
+        lockfile.commit()
 
     def create_branch(self, branch_name: str, start_oid: str) -> str:
         if INVALID_NAME.search(branch_name):
@@ -108,8 +125,7 @@ class Refs:
         
         try:
             lockfile.hold_for_update()
-            lockfile.write(oid.encode("utf-8") + b'\n')
-            lockfile.commit()
+            self.write_lockfile(lockfile, oid)
         except FileNotFoundError:
             path.parent.mkdir(parents=True, exist_ok=True)
             return self._update_ref_file(path, oid)
