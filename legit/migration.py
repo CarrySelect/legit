@@ -22,7 +22,7 @@ class Migration:
         ),
         "stale_directory": (
             "Updating the following directories would lose untracked files in them:",
-            "\n",
+            "",
         ),
         "untracked_overwritten": (
             "The following untracked working tree files would be overwritten by checkout:",
@@ -75,7 +75,13 @@ class Migration:
 
     @staticmethod
     def _ancestor_dirs(p: Path) -> List[Path]:
-         return list(reversed([parent for parent in p.parents if parent != Path(".")]))
+        # include the directory itself, plus any parents up to repo-root
+        dirs = [p]
+        for parent in p.parents:
+            if parent == Path("."):
+                break
+            dirs.append(parent)
+        return dirs
 
     def record_change(self, path: Path, old_item, new_item) -> None:
         """Populate *changes*, *mkdirs*, and *rmdirs* like the Ruby method."""

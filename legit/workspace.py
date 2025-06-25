@@ -1,4 +1,5 @@
 import os
+import stat
 import shutil
 from typing import MutableMapping, TYPE_CHECKING
 from collections.abc import Iterator
@@ -25,7 +26,7 @@ class Workspace:
     def apply_migration(self, migration: Migration) -> None:
         self.apply_change_list(migration, "delete")
 
-        for d in sorted(migration.rmdirs, key=lambda p: (len(p.parts), p)):
+        for d in sorted(migration.rmdirs, key=lambda p: p.parts, reverse=True):
             self.remove_directory(d)
 
         for d in sorted(migration.mkdirs, key=lambda p: (len(p.parts), p)):
@@ -80,11 +81,17 @@ class Workspace:
 
     def make_directory(self, dirname: Path) -> None:
         path = self.path / dirname
+        stat_result = self.stat_file(dirname)
 
-        if path.is_file():
+        if self._is_file(stat_result):
             path.unlink()
 
         path.mkdir(exist_ok=True, parents=True)
+
+    def _is_file(self, stat_result: os.stat_result | None) -> bool:
+        if stat_result is None:
+            return False
+        return stat.S_ISREG(stat_result.st_mode)
 
     def list_files(self, path: Path) -> Iterator[Path]:
         if path.is_dir():
