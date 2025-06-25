@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import os
 import stat as _stat
 from pathlib import Path
-from typing import Dict, List, Set, Tuple, TYPE_CHECKING
+from typing import Dict, List, Optional, Set, Tuple, TYPE_CHECKING, reveal_type
 
 from legit.blob import Blob
+from legit.index import Entry, Index
 from legit.inspector import Inspector
+from legit.tree import DatabaseEntry
+from legit.tree_diff import TreeDiff
+
 
 if TYPE_CHECKING:
     from legit.repository import Repository
@@ -34,11 +39,15 @@ class Migration:
         ),
     }
 
-    def __init__(self, repo: "Repository", tree_diff) -> None:
+    def __init__(
+        self,
+        repo: "Repository",
+        tree_diff: dict[Path, list[DatabaseEntry]],
+    ) -> None:
         self.repo: "Repository" = repo
-        self.tree_diff = tree_diff 
+        self.tree_diff: dict[Path, list[DatabaseEntry]] = tree_diff 
 
-        self.changes: Dict[str, List[Tuple[Path, object]]] = {
+        self.changes: Dict[str, List[Tuple[Path, Optional[DatabaseEntry]]]] = {
             k: [] for k in ("create", "update", "delete")
         }
         self.mkdirs: Set[Path] = set()
@@ -83,25 +92,30 @@ class Migration:
             dirs.append(parent)
         return dirs
 
-    def record_change(self, path: Path, old_item, new_item) -> None:
+    def record_change(self, path: Path, old_item: Optional[DatabaseEntry], new_item: Optional[DatabaseEntry]) -> None:
         """Populate *changes*, *mkdirs*, and *rmdirs* like the Ruby method."""
         dir_chain = self._ancestor_dirs(path.parent)
-
-        if old_item is None:                      # creation
+    
+        if old_item is None:
             self.mkdirs.update(dir_chain)
             action = "create"
-        elif new_item is None:                    # deletion
+        elif new_item is None:
             self.rmdirs.update(dir_chain)
             action = "delete"
-        else:                                     # update / replace
-            self.mkdirs.update(dir_chain)         # still need parent dirs
+        else:                                     
+            self.mkdirs.update(dir_chain)
             action = "update"
 
         self.changes[action].append((path, new_item))
 
-    def check_for_conflict(self, path: Path, old_item, new_item) -> None:
-        entry = self.repo.index.entry_for_path(path)
-
+    def check_for_conflict(
+        self,
+        path: Path,
+        old_item: Optional[DatabaseEntry],
+        new_item: Optional[DatabaseEntry],
+    ) -> None:
+        entry: Optional[Entry] = self.repo.index.entry_for_path(path)
+        
         if self.index_differs_from_trees(entry, old_item, new_item):
             self.conflicts["stale_file"].add(str(path))
             return
@@ -129,14 +143,19 @@ class Migration:
                 self.conflicts[conflict_type].add(str(path))
 
     @staticmethod
-    def _is_file(st) -> bool:
-        return st is not None and _stat.S_ISREG(st.st_mode)
+    def _is_file(stat_result: Optional[os.stat_result]) -> bool:
+        return stat_result is not None and _stat.S_ISREG(stat_result.st_mode)
 
     @staticmethod
-    def _is_dir(st) -> bool:
-        return st is not None and _stat.S_ISDIR(st.st_mode)
+    def _is_dir(stat_result: Optional[os.stat_result]) -> bool:
+        return stat_result is not None and _stat.S_ISDIR(stat_result.st_mode)
 
-    def get_error_type(self, stat, entry, item) -> str:
+    def get_error_type(
+        self,
+        stat: Optional[os.stat_result],
+        entry: Optional[Entry],
+        item: Optional[DatabaseEntry],
+    ) -> str:
         if entry is not None:
             return "stale_file"
         elif self._is_dir(stat):
@@ -146,7 +165,12 @@ class Migration:
         else:
             return "untracked_removed"
 
-    def index_differs_from_trees(self, entry, old_item, new_item) -> bool:
+    def index_differs_from_trees(
+        self,
+        entry: Optional[Entry],
+        old_item: Optional[DatabaseEntry],
+        new_item: Optional[DatabaseEntry],
+    ) -> bool:
         """
         The index conflicts when it differs from *both* the current tree
         and the target tree.
@@ -200,5 +224,7 @@ class Migration:
         for action in ("create", "update"):
             for path, entry in self.changes[action]:
                 stat = self.repo.workspace.stat_file(path)
+                assert entry is not None
+                assert stat is not None
                 self.repo.index.add(path, entry.oid, stat)
 

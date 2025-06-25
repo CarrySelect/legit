@@ -1,7 +1,10 @@
 import os
 import stat
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, reveal_type
+
+from legit.index import Entry
+from legit.tree import DatabaseEntry
 
 
 if TYPE_CHECKING:
@@ -17,7 +20,7 @@ class Inspector:
     def __init__(self, repo: Repository) -> None:
         self.repo: Repository = repo
 
-    def compare_index_to_workspace(self, entry, stat: os.stat_result | None) -> Optional[str]:
+    def compare_index_to_workspace(self, entry: Optional[Entry], stat: os.stat_result | None) -> Optional[str]:
         if entry is None:
             return "untracked"
 
@@ -37,7 +40,9 @@ class Inspector:
         if entry.oid != oid:
             return "modified"
 
-    def compare_tree_to_index(self, item, entry) -> Optional[str]:
+        return None
+
+    def compare_tree_to_index(self, item: Optional[DatabaseEntry], entry: Optional[Entry]) -> Optional[str]:
         if item is None and entry is None:
             return None
 
@@ -50,7 +55,12 @@ class Inspector:
         if entry.mode() != item.mode or entry.oid != item.oid:
             return "modified"
 
-    def _is_trackable_file(self, path: Path, stat: os.stat_result) -> bool:
+        return None
+
+    def _is_trackable_file(self, path: Path, stat: Optional[os.stat_result]) -> bool:
+        if stat is None:
+            return False
+
         if self._is_file(stat):
             return not self.repo.index.is_tracked_file(path)
         

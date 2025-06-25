@@ -1,8 +1,10 @@
+from pathlib import Path
+from typing import cast
 from legit.cmd_base import Base
 from legit.migration import Migration
 from legit.repository import Repository
 from legit.revision import Revision
-from legit.tree_diff import TreeDiff
+from legit.tree import DatabaseEntry
 
 
 class Checkout(Base):
@@ -25,7 +27,7 @@ class Checkout(Base):
         
         assert self.target_oid is not None
         tree_diff = self.repo.database.tree_diff(self.current_oid, self.target_oid)
-        migration = self.repo.migration(tree_diff)
+        migration = self.repo.migration(cast(dict[Path, list[DatabaseEntry]], tree_diff))
         
         try:
             migration.apply_changes()

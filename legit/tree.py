@@ -1,5 +1,5 @@
 from legit.index import Entry
-from typing import Callable, MutableMapping
+from typing import Any, Callable, MutableMapping
 from pathlib import Path
 
 
@@ -13,7 +13,7 @@ class DatabaseEntry:
     def is_tree(self) -> bool:
         return self.mode == DatabaseEntry.TREE_MODE
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, DatabaseEntry):
             return NotImplemented
         return (

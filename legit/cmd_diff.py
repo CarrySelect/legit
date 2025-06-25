@@ -63,6 +63,7 @@ class Diff(Base):
 
     def from_index(self, path: Path) -> 'Target':
         entry = self.repo.index.entry_for_path(path)
+        assert entry is not None
         blob = self.repo.database.load(entry.oid)
         assert isinstance(blob, Blob)
         return Target(path, entry.oid, oct(entry.mode())[2:], blob.data)

@@ -82,6 +82,7 @@ class Status:
         if status is not None:
             self.record_change(entry.path, self.workspace_changes, status)
         else:
+            assert stat_result is not None
             self.repo.index.update_entry_stat(entry, stat_result)
 
     def check_index_against_head_tree(self, entry: Entry) -> None:

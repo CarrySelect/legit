@@ -21,7 +21,7 @@ class Repository:
     def status(self) -> Status:
         return Status(self)
 
-    def migration(self, tree_diff: dict[Path, DatabaseEntry]) -> 'Migration':
+    def migration(self, tree_diff: dict[Path, list[DatabaseEntry]]) -> 'Migration':
         return Migration(self, tree_diff)
 
 

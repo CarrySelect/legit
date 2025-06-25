@@ -59,7 +59,8 @@ class Add(Base):
     def add_to_index(self, path: Path) -> None:
         data = self.repo.workspace.read_file(path)
         stat = self.repo.workspace.stat_file(path)
-        
+        assert stat is not None
+
         blob = Blob(data)
         self.repo.database.store(blob)
         self.repo.index.add(path, blob.oid, stat)

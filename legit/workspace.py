@@ -1,15 +1,13 @@
 import os
 import stat
 import shutil
-from typing import MutableMapping, TYPE_CHECKING
+from typing import MutableMapping, TYPE_CHECKING, Optional
 from collections.abc import Iterator
 from pathlib import Path
 
-if TYPE_CHECKING:
-    from legit.repository import Migration
-else:
-    Migration = None
 
+if TYPE_CHECKING:
+    from legit.migration import Migration
 
 
 class Workspace:
@@ -23,7 +21,7 @@ class Workspace:
     def __init__(self, path: Path) -> None:
         self.path: Path = path
 
-    def apply_migration(self, migration: Migration) -> None:
+    def apply_migration(self, migration: 'Migration') -> None:
         self.apply_change_list(migration, "delete")
 
         for d in sorted(migration.rmdirs, key=lambda p: p.parts, reverse=True):
@@ -45,7 +43,7 @@ class Workspace:
        except (FileNotFoundError, NotADirectoryError):
            pass
 
-    def apply_change_list(self, migration: Migration, action: str) -> None:
+    def apply_change_list(self, migration: 'Migration', action: str) -> None:
         for filename, entry in migration.changes[action]:
             path = self.path / filename
 
@@ -63,7 +61,9 @@ class Workspace:
             path.parent.mkdir(parents=True, exist_ok=True)
 
             flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-            
+
+            assert entry is not None
+
             if entry.is_tree():
                 self.make_directory(filename)
             else:
@@ -126,7 +126,7 @@ class Workspace:
         except PermissionError:
             raise Workspace.NoPermission(f"open(\"{path.name}\"): Permission denied")
 
-    def stat_file(self, path: Path) -> os.stat_result:
+    def stat_file(self, path: Path) -> Optional[os.stat_result]:
         try:
             return (self.path / path).stat()
         except FileNotFoundError:
