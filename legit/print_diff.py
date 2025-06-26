@@ -1,0 +1,87 @@
+from pathlib import Path
+from legit.diff import diff_hunks
+from legit.hunk import Hunk
+from legit.myers import Edit
+
+
+class Target:
+    NULL_PATH = "/dev/null"
+
+    def __init__(self, path: Path, oid: str, mode: str | None, data: str) -> None:
+        self.path: Path = path
+        self.oid: str = oid
+        self.mode: str | None = mode
+        self.data: str = data
+
+    def diff_path(self) -> Path | str:
+        return self.path if self.mode is not None else Target.NULL_PATH
+
+
+class PrintDiffMixin:
+    def define_print_diff_options(self) -> None:
+        if any(x in self.args for x in ("-p", "-u", "--patch")):
+            self.patch = True
+        if any(x in self.args for x in ("-s", "--no-patch")):
+            self.patch = False
+
+    def print_diff(self, a: Target, b: Target) -> None:
+        if a.oid == b.oid:
+            return
+
+        a.path = Path("a") / a.path
+        b.path = Path("b") / b.path
+        
+        self._header(f"diff --git {a.path} {b.path}")
+        self.print_diff_mode(a, b)
+        self.print_diff_content(a, b)
+
+    def print_diff_mode(self, a: Target, b: Target) -> None:
+        if a.mode is None:
+            self._header(f"new file mode {b.mode}")
+        elif b.mode is None:
+            self._header(f"deleted file mode {a.mode}")
+        elif a.mode != b.mode:
+            self._header(f"old mode {a.mode}")
+            self._header(f"new mode {b.mode}")
+
+    def print_diff_content(self, a: Target, b: Target) -> None:
+        if a.oid == b.oid:
+            return
+
+        oid_range = f"index {self._short(a.oid)}..{self._short(b.oid)}"
+        if a.mode == b.mode:
+            oid_range += f" {a.mode}" 
+
+        self._header(oid_range)
+        self._header(f"--- {a.diff_path()}")
+        self._header(f"+++ {b.diff_path()}")
+    
+        hunks = diff_hunks(a.data, b.data)
+        for hunk in hunks:
+            self.print_diff_hunk(hunk)
+
+    def print_diff_hunk(self, hunk: Hunk) -> None:
+        self.println(self.fmt("cyan", hunk.header()))
+        for edit in hunk.edits:
+            self.print_diff_edit(edit)
+
+    def print_diff_edit(self, edit: Edit) -> None:
+        text = str(edit)
+
+        match edit.ty:
+            case c if c == "eql":
+                self.println(text)
+            case c if c == "ins":
+                self.println(self.fmt("green", text))
+            case c if c == "del":
+                self.println(self.fmt("red", text))
+
+    def _short(self, oid: str) -> str:
+        return self.repo.database.short_oid(oid)
+
+    def _header(self, string: str) -> None:
+        self.println(self.fmt("bold", string))
+
+
+
+
