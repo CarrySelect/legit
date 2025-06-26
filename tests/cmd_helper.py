@@ -5,6 +5,19 @@ from io import StringIO
 
 from legit.repository import Repository
 from legit.command import Command
+from legit.revision import Revision
+
+
+@pytest.fixture
+def resolve_revision(repo):
+    """
+    Returns a function that can resolve a revision expression to its object ID.
+    """
+    def _resolve_revision(expression):
+        return Revision(repo, expression).resolve()
+    
+    return _resolve_revision
+
 
 @pytest.fixture
 def repo_path(tmp_path):

@@ -9,6 +9,7 @@ from legit.tree import DatabaseEntry, Tree
 from legit.commit import Commit
 from legit.blob import Blob
 from legit.tree_diff import TreeDiff
+from legit.pathfilter import PathFilter
 
 
 TYPES: MutableMapping[str, Type[Blob | Commit | Tree]] = {
@@ -23,9 +24,9 @@ class Database:
         self.path: Path = path
         self.objects: MutableMapping[str, Blob | Commit | Tree] = {}
 
-    def tree_diff(self, a: str, b: str) -> dict[Path, list[Optional[DatabaseEntry]]]:
+    def tree_diff(self, a: str, b: str, pathfilter=PathFilter()) -> dict[Path, list[Optional[DatabaseEntry]]]:
         diff = TreeDiff(self)
-        diff.compare_oids(a, b)
+        diff.compare_oids(a, b, pathfilter)
         return diff.changes
 
     def load(self, oid: str) -> Blob | Commit | Tree:

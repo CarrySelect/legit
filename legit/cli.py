@@ -124,56 +124,86 @@ def checkout(target: str) -> None:
 
     run_cmd("checkout", target)
 
-@cli.command()
+
+@click.command()
 @click.option(
     "--abbrev-commit/--no-abbrev-commit",
+    "abbrev",
     default=None,
-    help="Use abbreviated commit hashes (default: auto)."
+    help="Use abbreviated commit hashes.",
 )
 @click.option(
-    "--pretty", "--format",
+    "--pretty",
+    "--format",
     "format_",
-    default=None,
+    default="medium",
     metavar="<format>",
-    help="Pretty-print format (e.g. medium, full, oneline)."
+    help="Pretty-print format (e.g., medium, oneline).",
 )
 @click.option(
     "--oneline",
     is_flag=True,
-    default=False,
-    help="Shortcut for --pretty=oneline and auto-abbrev."
+    help="Shortcut for --pretty=oneline --abbrev-commit.",
 )
-@click.argument("target", type=click.Path(exists=True, file_okay=False), default=".")
-def log(abbrev_commit: bool, format_: str, oneline: bool, target: str) -> None:
+@click.option(
+    "--decorate",
+    "decoration",
+    type=click.Choice(["short", "full", "no", "auto"], case_sensitive=False),
+    default="auto",
+    show_default=True,
+    help="Decorate refs. 'auto' is default, 'no' disables.",
+)
+@click.option(
+    "--patch", "-p",
+    "patch",
+    is_flag=True,
+    help="Show patch for each commit.",
+)
+@click.argument("revisions_and_paths", nargs=-1)
+def log(abbrev: bool | None, format_: str, oneline: bool, decoration: str, patch: bool, revisions_and_paths: tuple[str, ...]):
     """Display commit history."""
-    options = {
-        "abbrev": None,
-        "format": "medium",
-    }
-
-    if abbrev_commit is not None:
-        options["abbrev"] = abbrev_commit 
-
-    if format_:
-        options["format"] = format_
-
+    
+    # Process the --oneline shortcut, which overrides other format options
+    # and implies abbreviation unless explicitly disabled.
     if oneline:
-        if options["abbrev"] == "auto":
-            options["abbrev"] = True
-        options["format"] = "oneline"
+        format_ = "oneline"
+        if abbrev is None:  # Only default to abbrev if it wasn't set explicitly
+            abbrev = True
 
-    flags = []
-    if options["abbrev"] is True:
-        flags.append("--abbrev-commit")
-    elif options["abbrev"] is False:
-        flags.append("--no-abbrev-commit")
+    # Prepare the list of arguments for the backend command
+    cmd_args = ["log"]
 
-    if options["format"] == "oneline":
-        flags.append("--oneline")
-    elif options["format"] != "medium":
-        flags.append(f"--pretty={options['format']}")
+    # Add flags based on the final processed options
+    if abbrev is True:
+        cmd_args.append("--abbrev-commit")
+    elif abbrev is False:
+        cmd_args.append("--no-abbrev-commit")
 
-    run_cmd("log", *flags)
+    # Add pretty format if it's not the default
+    if format_ != "medium":
+        # The --oneline flag is the canonical way to get that format
+        if format_ == "oneline":
+             cmd_args.append("--oneline")
+        else:
+             cmd_args.append(f"--pretty={format_}")
+    
+    # Add decoration flag unless it's the default 'auto'
+    if decoration != "auto":
+        if decoration == "no":
+            cmd_args.append("--no-decorate")
+        else:
+            # For 'short' or 'full'. This matches git's --decorate=<format>
+            cmd_args.append(f"--decorate={decoration}")
+
+    if patch:
+        cmd_args.append("--patch")
+    
+    # Add any remaining arguments (revisions, paths)
+    if revisions_and_paths:
+        cmd_args.extend(revisions_and_paths)
+
+    # Execute the command with the constructed arguments
+    run_cmd(*cmd_args)
 
 
 if __name__ == '__main__':

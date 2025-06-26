@@ -1,10 +1,12 @@
 import re
+from pathlib import Path
 from collections import defaultdict
 from sys import is_stack_trampoline_active
 from typing import Any, Generator, Optional
 from legit.commit import Commit
 from legit.revision import Revision
 from legit.repository import Repository
+from legit.pathfilter import PathFilter
 
 
 class RevList:
@@ -18,6 +20,24 @@ class RevList:
         self.limited: bool = False
         self.output = []
         self.queue = []
+        self.prune = []
+        self.difs = {}
+
+        for rev in revs:
+            self.handle_revision(rev)
+
+        if not self.queue:
+            self.handle_revision("HEAD")
+
+        self.filter = PathFilter.build(self.prune)
+    
+    def tree_diff(self, old_oid, new_oid):
+        key = (old_oid, new_oid)
+        if key not in self.diffs:
+            self.diffs[key] = self.repo.database.tree_diff(
+                old_oid, new_oid, self.filter
+            )
+        return self.diffs[key]
 
     def load_commit(self, oid: Optional[str]) -> None:
         if oid is None:
@@ -36,7 +56,9 @@ class RevList:
         return flag in self.flags[oid]
 
     def handle_revision(self, rev):
-        if m := RevList.RANGE.match(rev):
+        if self.repo.workspace.stat_file(rev) is not None:
+            self.prune.append(Path(rev))
+        elif m := RevList.RANGE.match(rev):
             self.set_start_point(m.group(1), False)
             self.set_start_point(m.group(2), True)
         elif m := RevList.EXCLUDE.match(rev):
@@ -133,6 +155,8 @@ class RevList:
                 self.add_parents(commit)
             if self.is_marked(commit.oid, 'uninteresting'):
                 continue
+            if self.is_marked(commit.oid, 'treesame'):
+                continue
             yield commit
             
     def add_parents(self, commit):
@@ -140,10 +164,20 @@ class RevList:
             return
 
         parent = self.load_commit(commit.parent)
-        if parent is None:
+    
+        if self.is_marked(commit.oid, "uninteresting"):
+            if parent is not None:
+                self.mark_parents_uninteresting(parent)
+        else:
+            self.simplify_commit(commit)
+
+        if parent is not None:
+            self.enqueue_commit(parent)
+
+    def simplify_commit(self, commit):
+        if not self.prune:
             return
 
-        if self.is_marked(commit.oid, "uninteresting"):
-            self.mark_parents_uninteresting(parent)
+        if not self.tree_diff(commit.parent, commit.oid):
+            self.mark(commit.oid, "treesame")
 
-        self.enqueue_commit(parent)

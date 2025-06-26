@@ -67,7 +67,7 @@ class Log(PrintDiffMixin, Base):
         if not self.patch:
             return
 
-        diff = self.repo.database.tree_diff(commit.parent, commit.oid)
+        diff = self.rev_list.tree_diff(commit.parent, commit.oid)
         paths = sorted(diff.keys())
 
         self._blank_line()

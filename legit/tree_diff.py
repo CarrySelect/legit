@@ -18,7 +18,7 @@ class TreeDiff:
         self.database: Database = database
         self.changes: dict[Path, list[Optional[DatabaseEntry]]] = {}
 
-    def compare_oids(self, a: Optional[str], b: Optional[str], prefix: Path = Path()) -> None:
+    def compare_oids(self, a: Optional[str], b: Optional[str], pathfilter) -> None:
         if a == b:
             return
         
@@ -32,8 +32,8 @@ class TreeDiff:
             {Path(k): v for k, v in b_tree.entries.items()} if b_tree else {}
         ))
 
-        self.detect_deletions(a_entries, b_entries, prefix)
-        self.detect_additions(a_entries, b_entries, prefix)
+        self.detect_deletions(a_entries, b_entries, pathfilter)
+        self.detect_additions(a_entries, b_entries, pathfilter)
 
     def oid_to_tree(self, oid: Optional[str]) -> Optional[Tree]:
         if oid is None:
@@ -56,37 +56,46 @@ class TreeDiff:
         else:
             return None
 
-    def detect_deletions(self, a: dict[Path, DatabaseEntry], b: dict[Path, DatabaseEntry], prefix: Path = Path()) -> None:
-        for name, entry in a.items():
-            path = prefix / name
+    def detect_deletions(self, a: dict, b: dict, path_filter) -> None:
+        """
+        Look for entries in `a` that are different or missing in `b`,
+        recurse on sub-trees, and record any blob changes.
+        """
+        for name, entry in path_filter.each_entry(a):
             other = b.get(name)
-
             if entry == other:
                 continue
 
-            tree_a = entry.oid if entry is not None and entry.is_tree() else None
-            tree_b = other.oid if other is not None and other.is_tree() else None
+            sub_filter = path_filter.join(name)
 
-            self.compare_oids(tree_a, tree_b, path)
+            # if it's a tree, compare by oid; else None
+            tree_a = entry.oid if entry and entry.is_tree() else None
+            tree_b = other.oid if other and other.is_tree() else None
+            self.compare_oids(tree_a, tree_b, sub_filter)
 
+            # for blobs: None for trees, otherwise the entry itself
             blobs = [
-                None if entry is not None and entry.is_tree() else entry,
-                None if other is not None and other.is_tree() else other,
+                None if (e and e.is_tree()) else e
+                for e in (entry, other)
             ]
-
             if any(blobs):
-                self.changes[path] = blobs
+                self.changes[sub_filter.path] = blobs
 
-    def detect_additions(self, a: dict[Path, DatabaseEntry], b: dict[Path, DatabaseEntry], prefix: Path = Path()) -> None:
-        for name, entry in b.items():
-            path = prefix / name
+    def detect_additions(self, a: dict, b: dict, path_filter) -> None:
+        """
+        Look for entries in `b` that are new relative to `a`,
+        recurse on sub-trees, and record any blob additions.
+        """
+        for name, entry in path_filter.each_entry(b):
             other = a.get(name)
-
             if other is not None:
                 continue
 
-            if entry.is_tree():
-                self.compare_oids(None, entry.oid, path)
-            else:
-                self.changes[path] = [None, entry]
+            sub_filter = path_filter.join(name)
 
+            if entry.is_tree():
+                # new subtree
+                self.compare_oids(None, entry.oid, sub_filter)
+            else:
+                # new blob
+                self.changes[sub_filter.path] = [None, entry]
