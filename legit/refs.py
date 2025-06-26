@@ -3,7 +3,7 @@ from pathlib import Path
 from sys import path_hooks
 from typing import Any, Optional
 from legit.lockfile import Lockfile
-
+from collections import defaultdict
 
 INVALID_NAME = re.compile(r'''
       ^\.
@@ -66,6 +66,19 @@ class Refs:
         self.path: Path = path
         self.refs_path: Path = self.path / "refs"
         self.heads_path: Path = self.refs_path / "heads"
+
+    def reverse_refs(self) -> dict[str, list['Refs.Ref | Refs.SymRef']]:
+        table: dict[str, list['Refs.Ref | Refs.SymRef']] = defaultdict(list)
+
+        for ref in self.list_all_refs():
+            oid = ref.read_oid()
+            if oid is not None:
+                table[oid].append(ref)
+
+        return table
+
+    def list_all_refs(self):
+        return [Refs.SymRef(self, Refs.HEAD)] + self.list_refs(self.refs_path)
 
     def short_name(self, p: str) -> str:
         path = self.path / p

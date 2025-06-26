@@ -8,13 +8,12 @@ SGR_CODES: dict[str, int] = {
 
 class Color:
     @staticmethod
-    def format(color: str, msg: str) -> str:
-        code = SGR_CODES.get(color)
-        if code is None:
-            return msg
-        return f"\033[{code}m{msg}\033[0m"
+    def format(style, string):
+        if isinstance(style, str):
+            names = [style]
+        else:
+            names = list(style)
 
-
-
-
+        codes = [SGR_CODES[name] for name in names]
+        return f"\x1b[{';'.join(str(c) for c in codes)}m{string}\x1b[0m"
 
