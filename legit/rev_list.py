@@ -45,6 +45,7 @@ class RevList:
 
         assert oid is not None
         self.commits[oid] = self.repo.database.load(oid)
+        return self.commits[oid]
 
     def mark(self, oid: str, flag: str) -> bool:
         if flag in self.flags[oid]:
@@ -69,7 +70,7 @@ class RevList:
     def set_start_point(self, rev, interesting):
         if not rev:
             rev = "HEAD"
-
+        
         oid = Revision(self.repo, rev).resolve(Revision.COMMIT)
 
         commit = self.load_commit(oid)

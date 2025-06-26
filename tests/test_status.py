@@ -6,19 +6,11 @@ from io import StringIO
 from legit.command import Command
 from legit.repository import Repository
 
-from tests.cmd_helper import (
+from tests.conftest import (
+    assert_status,
     assert_stdout,
-    repo,
-    make_executable,
-    make_unreadable,
-    repo_path,
-    write_file,
-    commit,
-    legit_cmd,
-    mkdir,
-    delete,
-    touch,
-    committed_repo,
+    assert_noent,
+    assert_stderr,
 )
 
 

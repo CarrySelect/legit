@@ -4,15 +4,6 @@ from io import StringIO
 from legit.command import Command
 from legit.repository import Repository
 
-from tests.cmd_helper import (
-    repo,
-    make_executable,
-    make_unreadable,
-    repo_path,
-    write_file,
-    legit_cmd,
-)
-
 def get_index(repo):
     """
     Load the index and return a list of (mode, path) tuples.

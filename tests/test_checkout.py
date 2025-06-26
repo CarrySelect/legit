@@ -1,14 +1,3 @@
-"""pytest translation of the Command::Checkout test suite from the Minitest
-spec found in jit.git.  It relies on the helper fixtures already present in
-*tests/cmd_helper.py* so that the tests look and feel just like the Ruby
-original.
-
-All helper utilities that existed in the Ruby spec (e.g. `commit_all`,
-`commit_and_checkout`, `assert_stale_file`, etc.) have been recreated here in
-Python so each example reads almost one‑to‑one with the source material while
-still feeling idiomatic to `pytest`.
-"""
-
 from __future__ import annotations
 
 import textwrap
@@ -16,8 +5,6 @@ from pathlib import Path
 from typing import Dict
 
 import pytest
-
-from tests.cmd_helper import *
 
 
 @pytest.fixture(autouse=True)

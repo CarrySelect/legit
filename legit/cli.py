@@ -125,7 +125,7 @@ def checkout(target: str) -> None:
     run_cmd("checkout", target)
 
 
-@click.command()
+@cli.command()
 @click.option(
     "--abbrev-commit/--no-abbrev-commit",
     "abbrev",

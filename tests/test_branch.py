@@ -1,7 +1,5 @@
 import pytest
 
-from tests.cmd_helper import *
-
 @pytest.fixture
 def commit_chain(write_file, legit_cmd, commit):
     """

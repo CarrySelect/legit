@@ -10,45 +10,72 @@ from legit.rev_list import RevList
 
 class Log(PrintDiffMixin, Base):
     def run(self) -> None:
-        self.patch = False
-        self.define_print_diff_options()
-
+        """
+        Executes the log command, parsing options and displaying commit history.
+        """
         self.repo: Repository = Repository(self.dir / ".git")
         self.blank_line: bool = False
         
-        self.abbrev = "auto"
+        # Set default option values
+        self.abbrev = None
         self.format = "medium"
-        self.blank_line = False
         self.decorate = "auto"
+        self.patch = False
 
+        # This list will hold only the non-option arguments (revisions and paths)
+        positional_args = []
+
+        # Manually parse options from self.args and filter them from positional_args
+        # This ensures that only revisions and paths are passed to RevList.
         for arg in self.args:
             if arg == "--oneline":
                 if self.abbrev == "auto":
                     self.abbrev = True
                 self.format = "oneline"
+                continue
 
-            elif arg == "--abbrev-commit":
+            if arg == "--abbrev-commit":
                 self.abbrev = True
-            elif arg == "--no-abbrev-commit":
+                continue
+            if arg == "--no-abbrev-commit":
                 self.abbrev = False
+                continue
 
-            elif arg.startswith("--pretty="):
+            if arg.startswith("--pretty=") or arg.startswith("--format="):
                 self.format = arg.split("=", 1)[1]
-            elif arg.startswith("--format="):
-                self.format = arg.split("=", 1)[1]
-
-            elif arg.startswith("--decorate="):
-                self.decorate = arg.split("=", 1)[1] or "short"
-            elif arg == "--no-decorate":
+                continue
+            
+            if arg.startswith("--decorate="):
+                parts = arg.split("=", 1)
+                # Handle '--decorate' with no value, defaulting to 'short'
+                self.decorate = parts[1] if len(parts) > 1 and parts[1] else "short"
+                continue
+            
+            if arg == "--no-decorate":
                 self.decorate = "no"
-   
+                continue
+            
+            # Allow for -p as a patch flag
+            if arg == "--patch" or arg == "-p":
+                self.patch = True
+                continue
+            
+            # If it's not a recognized option, it must be a revision or path
+            positional_args.append(arg)
+
+
+        # Initialize diff/patch options and pager now that flags are parsed
+        self.define_print_diff_options()
         self.setup_pager()
 
+        # Prepare data for decorating commits
         self.reverse_refs = self.repo.refs.reverse_refs()
         self.current_ref = self.repo.refs.current_ref()
 
-        self.rev_list: RevList = RevList(self.repo, self.args)
+        # Use the cleaned list of arguments for RevList
+        self.rev_list: RevList = RevList(self.repo, positional_args)
         
+        # Iterate through the resolved commits and display them
         for commit in self.rev_list.each():
             self.show_commit(commit)
         
