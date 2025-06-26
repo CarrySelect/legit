@@ -124,6 +124,57 @@ def checkout(target: str) -> None:
 
     run_cmd("checkout", target)
 
+@cli.command()
+@click.option(
+    "--abbrev-commit/--no-abbrev-commit",
+    default=None,
+    help="Use abbreviated commit hashes (default: auto)."
+)
+@click.option(
+    "--pretty", "--format",
+    "format_",
+    default=None,
+    metavar="<format>",
+    help="Pretty-print format (e.g. medium, full, oneline)."
+)
+@click.option(
+    "--oneline",
+    is_flag=True,
+    default=False,
+    help="Shortcut for --pretty=oneline and auto-abbrev."
+)
+@click.argument("target", type=click.Path(exists=True, file_okay=False), default=".")
+def log(abbrev_commit: bool, format_: str, oneline: bool, target: str) -> None:
+    """Display commit history."""
+    options = {
+        "abbrev": None,
+        "format": "medium",
+    }
+
+    if abbrev_commit is not None:
+        options["abbrev"] = abbrev_commit 
+
+    if format_:
+        options["format"] = format_
+
+    if oneline:
+        if options["abbrev"] == "auto":
+            options["abbrev"] = True
+        options["format"] = "oneline"
+
+    flags = []
+    if options["abbrev"] is True:
+        flags.append("--abbrev-commit")
+    elif options["abbrev"] is False:
+        flags.append("--no-abbrev-commit")
+
+    if options["format"] == "oneline":
+        flags.append("--oneline")
+    elif options["format"] != "medium":
+        flags.append(f"--pretty={options['format']}")
+
+    run_cmd("log", *flags)
+
 
 if __name__ == '__main__':
     cli()

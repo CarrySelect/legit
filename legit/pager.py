@@ -34,7 +34,7 @@ class Pager:
             stdout=stdout or sys.stdout,
             stderr=stderr or sys.stderr,
             env=pager_env,
-            close_fds=True  # close other fds in the child
+            close_fds=True,
         )
 
         os.close(reader_fd)

@@ -112,7 +112,7 @@ class Database:
         return [oid for oid in oids if oid.startswith(name)]
 
     def short_oid(self, oid: str) -> str:
-        return oid[:6]
+        return oid[:7]
 
     def generate_temp_name(self) -> str:
         return f"tmp_obj_" + ''.join(random.choices(string.ascii_letters + string.digits, k=6))

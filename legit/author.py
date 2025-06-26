@@ -37,6 +37,9 @@ class Author:
 
         return cls(name, email, dt)
 
+    def readable_time(self) -> str:
+        return self.time.strftime("%a %b %-d %H:%M:%S %Y %z")
+
     def short_date(self) -> str:
         return self.time.strftime("%Y-%m-%d")
 
