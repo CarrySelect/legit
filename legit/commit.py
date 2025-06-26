@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import cast
 from legit.author import Author
 
@@ -50,6 +51,9 @@ class Commit:
 
     def type(self) -> str:
         return "commit"
+
+    def date(self) -> datetime:
+        return self.author.time
 
     def to_bytes(self) -> bytes:
         lines = [

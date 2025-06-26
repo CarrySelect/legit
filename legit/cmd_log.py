@@ -4,6 +4,8 @@ from legit.commit import Commit
 from legit.refs import Refs
 from legit.repository import Repository
 from legit.print_diff import PrintDiffMixin, Target
+from legit.revision import Revision
+from legit.rev_list import RevList
 
 
 class Log(PrintDiffMixin, Base):
@@ -44,20 +46,13 @@ class Log(PrintDiffMixin, Base):
 
         self.reverse_refs = self.repo.refs.reverse_refs()
         self.current_ref = self.repo.refs.current_ref()
+
+        self.rev_list: RevList = RevList(self.repo, self.args)
         
-        for commit in self.each_commit():
+        for commit in self.rev_list.each():
             self.show_commit(commit)
         
         self.exit(0)
-
-    def each_commit(self) -> Generator[Commit]:
-        oid = self.repo.refs.read_head()
-
-        while oid is not None:
-            commit = self.repo.database.load(oid)
-            assert isinstance(commit, Commit)
-            yield commit
-            oid = commit.parent
 
     def show_commit(self, commit: Commit) -> None:
         match self.format:
