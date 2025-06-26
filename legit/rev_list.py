@@ -21,7 +21,7 @@ class RevList:
         self.output = []
         self.queue = []
         self.prune = []
-        self.difs = {}
+        self.diffs = {}
 
         for rev in revs:
             self.handle_revision(rev)
@@ -99,7 +99,7 @@ class RevList:
             return
 
         index = next(
-            (i for i, c in enumerate(self.queue) if c.date < commit.date),
+            (i for i, c in enumerate(self.queue) if c.date() < commit.date()),
             None
         )
 
@@ -134,7 +134,7 @@ class RevList:
 
         # If the most‐recently‐output commit is older (or equal) than
         # the next one coming in, we’re still in order => still interesting.
-        if oldest_out and oldest_out.date <= newest_in.date:
+        if oldest_out and oldest_out.date() <= newest_in.date():
             return True
 
         # Otherwise, if there’s any commit in the queue that isn’t marked

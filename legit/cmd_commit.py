@@ -34,8 +34,8 @@ class Commit(Base):
         except FileNotFoundError:
             parent = None
 
-        name: str = os.environ["GIT_AUTHOR_NAME"]
-        email: str = os.environ["GIT_AUTHOR_EMAIL"]
+        name: str = self.env["GIT_AUTHOR_NAME"]
+        email: str = self.env["GIT_AUTHOR_EMAIL"]
         author: Author = Author(name, email, datetime.now().astimezone())
         message: str = self.stdin.read()
     

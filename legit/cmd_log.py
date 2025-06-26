@@ -29,7 +29,7 @@ class Log(PrintDiffMixin, Base):
         # This ensures that only revisions and paths are passed to RevList.
         for arg in self.args:
             if arg == "--oneline":
-                if self.abbrev == "auto":
+                if self.abbrev is None:
                     self.abbrev = True
                 self.format = "oneline"
                 continue
@@ -106,7 +106,7 @@ class Log(PrintDiffMixin, Base):
     def from_diff_item(self, path, item) -> Target:
         if item is not None:
             blob = self.repo.database.load(item.oid)
-            return Target(path, item.oid, oct(item.mode())[2:], blob.data)
+            return Target(path, item.oid, oct(item.mode)[2:], blob.data)
         else:
             return Target(path, '0' * 40, None, '')
 
@@ -141,9 +141,7 @@ class Log(PrintDiffMixin, Base):
             return ''
 
         head = [r for r in refs if self.is_target(r)]
-        print(f"{head=}")
         refs = [r for r in refs if not self.is_target(r)]
-        print(f"{refs=}")
 
         names = [self.decoration_name(head[0] if head else None, ref) for ref in refs]
 
