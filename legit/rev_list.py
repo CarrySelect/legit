@@ -39,12 +39,12 @@ class RevList:
             )
         return self.diffs[key]
 
-    def load_commit(self, oid: Optional[str]) -> None:
+    def load_commit(self, oid: Optional[str]) -> Optional[Commit]:
         if oid is None:
-            return
-
-        assert oid is not None
-        self.commits[oid] = self.repo.database.load(oid)
+            return None
+    
+        if oid not in self.commits:
+            self.commits[oid] = self.repo.database.load(oid)
         return self.commits[oid]
 
     def mark(self, oid: str, flag: str) -> bool:
@@ -176,17 +176,16 @@ class RevList:
 
     def simplify_commit(self, commit):
         if not self.prune:
-            return
+            return commit.parents
         
         parents = commit.parents
         parents = [None] if not parents else parents
 
         for oid in parents:
-            diff = self.tree_diff(oid, commit.oid)
-            if not diff:
+            if self.tree_diff(oid, commit.oid):
                 continue
             self.mark(commit.oid, "treesame")
-            return list(oid)
+            return [oid] if oid else []
 
         return commit.parents
 

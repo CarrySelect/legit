@@ -108,8 +108,6 @@ class Database:
         for filename in files:
             oids.append(f"{dirname.name}{filename.name}")
 
-        print(f"{oids=}")
-
         return [oid for oid in oids if oid.startswith(name)]
 
     def short_oid(self, oid: str) -> str:

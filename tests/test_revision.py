@@ -29,19 +29,23 @@ def test_parses_object_id():
 
 
 def test_parses_parent_ref():
-    assert_parse("HEAD^", Revision.Parent(Revision.Ref("HEAD")))
+    # HEAD^   -> parent number 1
+    assert_parse("HEAD^", Revision.Parent(Revision.Ref("HEAD"), 1))
+
+
+def test_parses_parent_ref_with_number():
+    # @^2     -> parent number 2
+    assert_parse("@^2", Revision.Parent(Revision.Ref("HEAD"), 2))
 
 
 def test_parses_chain_of_parent_refs():
-    expr = "master^^^"
+    # master^^^ -> master^1^1^1
     tree = Revision.Parent(
         Revision.Parent(
-            Revision.Parent(
-                Revision.Ref("master")
-            )
-        )
+            Revision.Parent(Revision.Ref("master"), 1), 1
+        ), 1
     )
-    assert_parse(expr, tree)
+    assert_parse("master^^^", tree)
 
 
 def test_parses_ancestor_ref():
@@ -52,7 +56,7 @@ def test_parses_chain_of_parents_and_ancestors():
     expr = "@~2^^~3"
     # Equivalent to: ((HEAD~2)^^)~3
     inner = Revision.Ancestor(Revision.Ref("HEAD"), 2)
-    after_parents = Revision.Parent(Revision.Parent(inner))
+    after_parents = Revision.Parent(Revision.Parent(inner, 1), 1)
     tree = Revision.Ancestor(after_parents, 3)
     assert_parse(expr, tree)
 

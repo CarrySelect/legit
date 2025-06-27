@@ -38,10 +38,10 @@ class Revision:
             return context.commit_parent(self.rev.resolve(context), self.n)
         
         def __eq__(self, other: Any) -> bool:
-            return isinstance(other, Revision.Parent) and self.rev == other.rev
+            return isinstance(other, Revision.Parent) and self.rev == other.rev and self.n == other.n
         
         def __hash__(self) -> int:
-            return hash(self.rev)
+            return hash((self.rev, self.n))
 
         def __repr__(self) -> str:
             return f"Parent(rev={self.rev!r})"
@@ -79,7 +79,7 @@ class Revision:
           [\x00-\x20*:?\[\\^~\x7f]  # control or disallowed chars
         """, re.X)
 
-    PARENT_PATTERN   = re.compile(r'^(.+)\^(\d)$')
+    PARENT_PATTERN   = re.compile(r'^(.+)\^(\d*)$')
     ANCESTOR_PATTERN = re.compile(r'^(.+)~(\d+)$')
 
     REF_ALIASES = {
@@ -170,12 +170,7 @@ class Revision:
         if oid is not None:
             return oid
         
-        print(f"name is {name}")
-        print(f"oid is {oid}")
-
         candidates = self.repo.database.prefix_match(name)
-
-        print(f"candidates is {candidates}")
         if len(candidates) == 1:
             return candidates[0]
 

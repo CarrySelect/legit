@@ -14,7 +14,7 @@ class Merge(WriteCommitMixin, Base):
         merge_oid = revision.resolve(Revision.COMMIT)
 
         common = Bases(self.repo.database, head_oid, merge_oid)
-        base_oid = common.find()
+        base_oid = common.find()[0]
 
         self.repo.index.load_for_update()
 

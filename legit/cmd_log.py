@@ -91,7 +91,7 @@ class Log(PrintDiffMixin, Base):
         self.show_patch(commit)
 
     def show_patch(self, commit: Commit) -> None:
-        if not self.patch and len(commit.parents) > 1:
+        if not self.patch or len(commit.parents) > 1:
             return
 
         diff = self.rev_list.tree_diff(commit.parent, commit.oid)

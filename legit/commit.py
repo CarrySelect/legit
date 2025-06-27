@@ -14,7 +14,10 @@ class Commit:
 
     @property
     def parent(self):
-        return self.parents[0]
+        try:
+            return self.parents[0]
+        except IndexError:
+            return None
     
     @parent.setter
     def parent(self, value):

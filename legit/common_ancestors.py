@@ -56,7 +56,7 @@ class CommonAncestors:
         else:
             self.add_parents(commit, flags)
 
-    def _add_parents(self, commit: Commit, flags: set[str]) -> None:
+    def add_parents(self, commit: Commit, flags: set[str]) -> None:
         for parent_oid in commit.parents:
             if self.flags[parent_oid].issuperset(flags):
                 continue
@@ -66,13 +66,4 @@ class CommonAncestors:
             parent_commit = self.database.load(parent_oid)
             self.insert_by_date(self.queue, parent_commit)
 
-    def add_parents(self, commit: Commit, flags: set[str]) -> None:
-        if commit.parent is None:
-            return
 
-        parent = self.database.load(commit.parent)
-        if self.flags[parent.oid].issuperset(flags):
-            return
-
-        self.flags[parent.oid].update(flags)
-        self.insert_by_date(self.queue, parent)

@@ -18,7 +18,7 @@ class Commit(WriteCommitMixin, Base):
         self.repo.index.load()
         parent = self.repo.refs.read_head()
         message: str = self.stdin.read()
-        commit = self.write_commit([parent], message)
+        commit = self.write_commit([parent] if parent else [], message)
     
         is_root: str = "(root-commit) " if parent is None else ""
         self.println(f"[{is_root}{commit.oid}] {message.splitlines()[0]}")
