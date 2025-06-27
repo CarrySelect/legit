@@ -1,40 +1,66 @@
+from collections import defaultdict
 from datetime import datetime
-from typing import cast
+from typing import Optional, cast
 from legit.author import Author
 
 
 class Commit:
-    def __init__(self, parent: str | None, tree: str, author: Author, message: str) -> None:
-        self.parent: str | None = parent
+    def __init__(self, parents: list[Optional[str]], tree: str, author: Author, message: str) -> None:
+        self.parents: list[Optional[str]] = parents
         self.tree: str = tree
         self.author: Author = author
         self.message: str = message
         self._oid: str | None = None
 
+    @property
+    def parent(self):
+        return self.parents[0]
+    
+    @parent.setter
+    def parent(self, value):
+        self.parents[0] = value
+
     @classmethod
-    def parse(cls, data: bytes) -> 'Commit':
-        headers: dict[str, str] = {}
+    def parse(cls, data: bytes) -> "Commit":
+        """
+        Parse the raw `commit` object payload exactly like the Ruby version.
 
-        lines = data.decode('utf-8').split('\n')
-        idx = 0
-        for idx, line in enumerate(lines):
-            if not line:
+        * **Multiple headers per key** are kept (e.g. several `parent` lines).
+        * We stop at the first *empty* line and treat everything after it as the
+          commit message, preserving all newlines exactly.
+        * The return value’s first argument is a `list[str]` of parents,
+          mirroring the Ruby array, even when it is empty.
+        """
+        text = data.decode("utf-8", errors="replace")
+
+        headers: dict[str, list[str]] = defaultdict(list)
+        pos = 0
+        while True:
+            nl = text.find("\n", pos)
+            if nl == -1:
+                raise ValueError("unterminated commit headers")
+            line = text[pos:nl]
+            pos = nl + 1
+            if line == "":
                 break
-            key, val = line.split(' ', 1)
-            headers[key] = val
 
-        message = '\n'.join(lines[idx+1:])
+            key, value = line.split(" ", 1)
+            headers[key].append(value)
 
-        assert headers['tree'] is not None
+        message = text[pos:] 
 
-        author = Author.parse(headers['author'])
-        assert author is not None
+        tree_values = headers.get("tree")
+        if not tree_values:
+            raise ValueError("commit object missing 'tree' header")
+        author_values = headers.get("author")
+        if not author_values:
+            raise ValueError("commit object missing 'author' header")
 
         return cls(
-            headers.get('parent'),
-            headers['tree'],
-            author, 
-            message,
+            parents=headers.get("parent", []),
+            tree=tree_values[0],
+            author=Author.parse(author_values[0]),
+            message=message,
         )
 
     @property
@@ -60,9 +86,9 @@ class Commit:
             f"tree {self.tree}",
         ]
 
-        if self.parent is not None:
+        for parent in self.parents:
             lines += [
-                f"parent {self.parent}"
+                f"parent {parent}"
             ]
 
         lines.extend([

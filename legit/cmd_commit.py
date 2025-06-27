@@ -8,43 +8,20 @@ from legit.tree import Tree
 from legit.author import Author
 from legit.commit import Commit as CommitObject
 from legit.cmd_base import Base
+from legit.write_commit import WriteCommitMixin
 
-class Commit(Base):
-    def __init__(
-        self,
-        _dir: Path,
-        env: MutableMapping[str, str],
-        args: list[str],
-        stdin: TextIO,
-        stdout: TextIO,
-        stderr: TextIO,
-    ) -> None:
-        super().__init__(_dir, env, args, stdin, stdout, stderr)
 
+class Commit(WriteCommitMixin, Base):
     def run(self) -> None:
-        repo = Repository(self.dir / ".git")
-
-        repo.index.load()
-
-        root = Tree.from_entries(repo.index.entries)
-        root.traverse(lambda tree: repo.database.store(tree))
-
-        try:
-            parent: str | None = repo.refs.read_head()
-        except FileNotFoundError:
-            parent = None
-
-        name: str = self.env["GIT_AUTHOR_NAME"]
-        email: str = self.env["GIT_AUTHOR_EMAIL"]
-        author: Author = Author(name, email, datetime.now().astimezone())
-        message: str = self.stdin.read()
-    
-        assert root.oid is not None
-        commit = CommitObject(parent, root.oid, author, message)
-        repo.database.store(commit)
+        self.repo = Repository(self.dir / ".git")
         
-        repo.refs.update_head(commit.oid)
-
+        self.repo.index.load()
+        parent = self.repo.refs.read_head()
+        message: str = self.stdin.read()
+        commit = self.write_commit([parent], message)
+    
         is_root: str = "(root-commit) " if parent is None else ""
-        print(f"[{is_root}{commit.oid}] {message.splitlines()[0]}")
+        self.println(f"[{is_root}{commit.oid}] {message.splitlines()[0]}")
+
+        self.exit(0)
 
