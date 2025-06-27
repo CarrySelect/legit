@@ -17,7 +17,7 @@ class Resolve:
         self.add_conflicts_to_index()
         self.write_untracked_files()
 
-    def write_utnracked_files(self) -> None:
+    def write_untracked_files(self) -> None:
         for path, item in self.untracked.items():
             blob = self.repo.database.load(item.oid)
             self.repo.workspace.write_file(path, blob.data)
@@ -38,7 +38,7 @@ class Resolve:
 
         for path, (old_item, new_item) in self.right_diff.items():
             if new_item is not None:
-                self.file_dir_conflict(path, self.left_diff, self.right_diff, self.inputs.left_name)
+                self.file_dir_conflict(path, self.left_diff, self.inputs.left_name)
             self.same_path_conflict(path, old_item, new_item)
     
         for path, (old_item, new_item) in self.left_diff.items():

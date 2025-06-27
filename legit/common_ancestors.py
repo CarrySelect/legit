@@ -30,7 +30,6 @@ class CommonAncestors:
         while not self._all_stale():
             self._process_queue()
 
-        # Ruby:  @results.map(&:oid).reject { |oid| marked?(oid, :stale) }
         return [
             commit.oid
             for commit in self.results

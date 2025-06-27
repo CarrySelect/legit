@@ -190,7 +190,7 @@ class Index:
             self.store_entry(Entry.parse(entry))
 
     def store_entry(self, entry: 'Entry') -> None:
-        self.entries[entry.path] = entry
+        self.entries[entry.key()] = entry
         for dirname in entry.parent_directories():
             self.parents[dirname].add(entry.path)
 

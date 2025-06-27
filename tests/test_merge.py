@@ -154,3 +154,5 @@ class TestMultipleCommonAncestors:
         cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
         assert_stdout(stdout, "")
 
+
+

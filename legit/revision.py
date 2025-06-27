@@ -71,7 +71,7 @@ class Revision:
 
     INVALID_NAME = re.compile(r"""
           ^\.          |    # starts with a dot
-          /\.\.        |    # slash-dot
+          /\.          |    # slash-dot
           \.\.         |    # two dots
           /$           |    # ends with slash
           \.lock$      |    # ends with '.lock'
@@ -147,10 +147,14 @@ class Revision:
         if oid is None:
             return None
 
-        assert oid is not None
-
         commit = self.load_typed_object(oid, Revision.COMMIT)
-        return commit.parents[n-1] if commit is not None and isinstance(commit, Commit) else None        
+        if commit is None:
+            return None
+
+        if n <= 0 or n > len(commit.parents):
+            return None
+
+        return commit.parents[n-1]       
     
     def load_typed_object(self, oid: Optional[str], ty: str) -> Optional['Tree | Commit | Blob']:
         if oid is None:
