@@ -34,13 +34,13 @@ class CommonAncestors:
         return [
             commit.oid
             for commit in self.results
-            if not self._marked(commit.oid, "stale")
+            if not self.is_marked(commit.oid, "stale")
         ]
 
     def _all_stale(self) -> bool:
-        return all(self._marked(c.oid, "stale") for c in self.queue)
+        return all(self.is_marked(c.oid, "stale") for c in self.queue)
 
-    def _marked(self, oid: str, flag: str) -> bool:
+    def is_marked(self, oid: str, flag: str) -> bool:
         return flag in self.flags[oid]
 
     def _process_queue(self) -> None:
