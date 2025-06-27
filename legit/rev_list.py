@@ -179,6 +179,8 @@ class RevList:
         if not self.prune:
             return
 
-        if not self.tree_diff(commit.parent, commit.oid):
+        diff = self.tree_diff(commit.parent, commit.oid)
+
+        if not diff:
             self.mark(commit.oid, "treesame")
 

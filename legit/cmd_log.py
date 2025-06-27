@@ -71,7 +71,7 @@ class Log(PrintDiffMixin, Base):
         # Prepare data for decorating commits
         self.reverse_refs = self.repo.refs.reverse_refs()
         self.current_ref = self.repo.refs.current_ref()
-
+    
         # Use the cleaned list of arguments for RevList
         self.rev_list: RevList = RevList(self.repo, positional_args)
         

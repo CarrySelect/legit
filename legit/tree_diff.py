@@ -26,10 +26,10 @@ class TreeDiff:
         b_tree = self.oid_to_tree(b)
 
         a_entries = cast(dict[Path, DatabaseEntry], (
-            {Path(k): v for k, v in a_tree.entries.items()} if a_tree else {}
+            {k: v for k, v in a_tree.entries.items()} if a_tree else {}
         ))
         b_entries = cast(dict[Path, DatabaseEntry], (
-            {Path(k): v for k, v in b_tree.entries.items()} if b_tree else {}
+            {k: v for k, v in b_tree.entries.items()} if b_tree else {}
         ))
 
         self.detect_deletions(a_entries, b_entries, pathfilter)
