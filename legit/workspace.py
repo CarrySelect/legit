@@ -21,6 +21,11 @@ class Workspace:
     def __init__(self, path: Path) -> None:
         self.path: Path = path
 
+    def write_file(self, path: Path, data: str) -> None:
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        with os.fdopen(os.open(self.path / path, flags, 0o644), "w") as f:
+            f.write(data)
+
     def apply_migration(self, migration: 'Migration') -> None:
         self.apply_change_list(migration, "delete")
 
@@ -31,7 +36,6 @@ class Workspace:
             self.make_directory(d)
 
         self.apply_change_list(migration, "update")
-
         self.apply_change_list(migration, "create")
       
     def _rm_rf(self, path: Path) -> None:
