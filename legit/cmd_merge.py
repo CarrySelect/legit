@@ -4,27 +4,30 @@ from legit.revision import Revision
 from legit.common_ancestors import CommonAncestors
 from legit.write_commit import WriteCommitMixin
 from legit.bases import Bases
+from legit.inputs import Inputs
+from legit.resolve import Resolve
+
 
 class Merge(WriteCommitMixin, Base):
     def run(self) -> None:
         self.repo = Repository(self.dir / ".git")
 
-        head_oid = self.repo.refs.read_head()
-        revision = Revision(self.repo, self.args[0])
-        merge_oid = revision.resolve(Revision.COMMIT)
+        self.inputs = Inputs(self.repo, "HEAD", self.args[0])
+        self.resolve_merge()
+        self.commit_merge()
+        
+        self.exit(0)
 
-        common = Bases(self.repo.database, head_oid, merge_oid)
-        base_oid = common.find()[0]
-
+    def resolve_merge(self) -> None:
         self.repo.index.load_for_update()
-
-        tree_diff = self.repo.database.tree_diff(base_oid, merge_oid)
-        migration = self.repo.migration(tree_diff)
-        migration.apply_changes()
+        
+        merge = Resolve(self.repo, self.inputs)
+        merge.execute()
 
         self.repo.index.write_updates()
 
+    def commit_merge(self) -> None:
+        parents = [self.inputs.left_oid, self.inputs.right_oid]
         message = self.stdin.read()
-        self.write_commit([head_oid, merge_oid], message)
+        self.write_commit(parents, message)
 
-        self.exit(0)
