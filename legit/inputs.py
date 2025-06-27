@@ -17,3 +17,9 @@ class Inputs:
 
     def resolve_rev(self, rev: str) -> str:
         return Revision(self.repo, rev).resolve(Revision.COMMIT)
+
+    def are_already_merged(self) -> bool:
+        return self.base_oids == [self.right_oid]
+
+    def are_fast_forward(self) -> bool:
+        return self.base_oids == [self.left_oid]

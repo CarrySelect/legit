@@ -13,6 +13,13 @@ class Merge(WriteCommitMixin, Base):
         self.repo = Repository(self.dir / ".git")
 
         self.inputs = Inputs(self.repo, "HEAD", self.args[0])
+
+        if self.inputs.are_already_merged():
+            self.handle_merged_ancestor()
+
+        if self.inputs.are_fast_forward():
+            self.handle_fast_forward()
+
         self.resolve_merge()
         self.commit_merge()
         
@@ -31,3 +38,23 @@ class Merge(WriteCommitMixin, Base):
         message = self.stdin.read()
         self.write_commit(parents, message)
 
+    def handle_merged_ancestor(self) -> None:
+        self.println("Already up to date.")
+        self.exit(0)
+
+    def handle_fast_forward(self) -> None:
+        a = self.repo.database.short_oid(self.inputs.left_oid)
+        b = self.repo.database.short_oid(self.inputs.right_oid)
+
+        self.println(f"Updating {a}..{b}")
+        self.println("Fast-forward")
+
+        self.repo.index.load_for_update()
+
+        tree_diff = self.repo.database.tree_diff(self.inputs.left_oid, self.inputs.right_oid)
+        self.repo.migration(tree_diff).apply_changes()
+
+        self.repo.index.write_updates()
+        self.repo.refs.update_head(self.inputs.right_oid)
+
+        self.exit(0)
