@@ -1,13 +1,9 @@
 import pytest
 from pathlib import Path
-from tests.conftest import assert_stdout
+from tests.conftest import assert_stdout, delete, legit_cmd, load_commit, make_executable
 
 
 def _snapshot_workspace(repo_path: Path) -> dict[str, str]:
-    """Return a {relative_path: contents} mapping for every *file* in the repo.
-
-    The `.git` directory is purposely ignored.
-    """
     result: dict[str, str] = {}
     for path in repo_path.rglob("*"):
         if ".git" in path.parts or not path.is_file():
@@ -17,21 +13,92 @@ def _snapshot_workspace(repo_path: Path) -> dict[str, str]:
 
 
 def assert_workspace(repo_path: Path, expected: dict[str, str]):
-    """Assert that the working directory exactly matches *expected*."""
     actual = _snapshot_workspace(repo_path)
     assert actual == expected, f"workspace mismatch – expected {expected}, got {actual}"
 
 
-
 @pytest.fixture
-def commit_tree(write_file, legit_cmd, commit):
-    """Commit *files* under *msg* the same way the Ruby helper did."""
+def commit_tree(write_file, legit_cmd, commit, delete):
     def _commit_tree(msg: str, files: dict[str, str]):
         for path, contents in files.items():
-            write_file(path, contents)
+            if contents is None:
+                make_executable(path)
+            elif isinstance(contents, str):
+                write_file(path, contents)
+            elif isinstance(contents, list):
+                write_file(path, contents[0])
+                make_executable(path)
+
+        delete(".git/index")
         legit_cmd("add", ".")
         commit(msg)
+    
     return _commit_tree
+
+
+@pytest.fixture
+def merge3(commit_tree, legit_cmd):
+    def _merge3(base, left, right):
+        commit_tree("A", base)
+        commit_tree("B", left)
+
+        legit_cmd("branch", "topic", "master^")
+        legit_cmd("checkout", "topic")
+        commit_tree("C", right)
+
+        legit_cmd("checkout", "master")
+        legit_cmd("merge", "topic", stdin_data="M")
+
+    return _merge3
+
+def assert_clean_merge(legit_cmd, load_commit):
+    cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
+    assert_stdout(stdout, "")
+
+    commit = load_commit("@")
+    old_head = load_commit("@^")
+    merge_head = load_commit("topic")
+
+    assert commit.message == "M"
+    assert commit.parents == [old_head.oid, merge_head.oid]
+
+def assert_no_merge(legit_cmd, load_commit):
+    commit = load_commit("@")
+    assert commit.message == "B"
+    assert len(commit.parents) == 1
+
+def assert_index(repo, *expected_entries):
+    repo.index.load()
+
+    actual_entries = [(str(entry.path), entry.stage) for entry in repo.index.entries.values()]
+
+    sorted_actual = sorted(actual_entries)
+    sorted_expected = sorted(list(expected_entries))
+
+    assert sorted_actual == sorted_expected, (
+        f"Index content mismatch.\n"
+        f"  Expected: {sorted_expected}\n"
+        f"  Actual:   {sorted_actual}"
+    )
+
+class TestMergingAnAncestor:
+    @pytest.fixture(autouse=True)
+    def setup(self, commit_tree, legit_cmd):
+        commit_tree("A", {"f.txt": "1"})
+        commit_tree("B", {"f.txt": "2"})
+        commit_tree("C", {"f.txt": "3"})
+
+        self.cmd, self.stdin, self.stdout, self.stderr = legit_cmd("merge", "@^")
+
+    def test_it_prints_the_up_to_date_message(self):
+        assert_stdout(self.stdout, "Already up to date.\n")
+
+    def test_it_does_not_change_repository_state(self, legit_cmd, load_commit):
+        commit = load_commit("@")
+        assert commit.message == "C"
+
+        cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
+        assert_stdout(stdout, "")
 
 
 class TestUnconflictedMergeWithTwoFiles:
