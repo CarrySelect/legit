@@ -32,6 +32,8 @@ class Merge(WriteCommitMixin, Base):
         merge.execute()
 
         self.repo.index.write_updates()
+        if self.repo.index.is_conflict():
+            self.exit(1)
 
     def commit_merge(self) -> None:
         parents = [self.inputs.left_oid, self.inputs.right_oid]

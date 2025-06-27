@@ -30,21 +30,39 @@ class Index:
 
     def __init__(self, path: Path) -> None:
         self.path: Path = path
-        self.entries: dict[Path, Entry] = {}
+        self.entries: dict[tuple[Path, int], Entry] = {}
         self.lockfile: Lockfile = Lockfile(path)
         self.digest: Hash | None = None
         self.changed: bool = False
         self.parents: dict[Path, set[Path]] = defaultdict(set)
 
+    def is_conflict(self) -> bool:
+        return any(stage > 0 for _, stage in self.entries)
+
+    def add_conflict_set(self, path: Path, items) -> None:
+        self.remove_entry_with_stage(path, 0)
+
+        for idx, item in enumerate(items):
+            if not item:
+                continue
+
+            entry = Entry.create_from_db(path, item, idx+1)
+            self.store_entry(entry)
+        
+        self.changed = True
+    
     def update_entry_stat(self, entry: 'Entry', stat: os.stat_result) -> None:
         entry.update_stat(stat)
         self.changed = True
 
-    def entry_for_path(self, path: Path) ->' Entry | None':
-        return self.entries.get(path)
+    def entry_for_path(self, path: Path, stage: int = 0) ->' Entry | None':
+        return self.entries.get((path, stage))
 
     def is_tracked_file(self, path: Path) -> bool:
-        return path in self.entries
+        for i in range(4):
+            if (path, i) in self.entries:
+                return True
+        return False
 
     def is_tracked(self, path: Path) -> bool:
         return self.is_tracked_file(path) or path in self.parents
@@ -70,7 +88,11 @@ class Index:
         self.remove_children(entry.path)
 
     def remove_entry(self, path: Path) -> None:
-        entry = self.entries.get(path)
+        for stage in range(4):
+            self.remove_entry_with_stage(path, stage)
+
+    def remove_entry_with_stage(self, path: Path, stage: int) -> None:
+        entry = self.entries.get((path, stage))
         if entry is None:
             return
 
@@ -223,6 +245,16 @@ class Entry:
         self.flags = flags
         self.path = path
 
+    @classmethod
+    def create_from_db(cls, path: Path, item, n: int) -> 'Entry':
+        p = str(path)
+        flags = (n << 12) | min(len(p), Entry.MAX_PATH_SIZE)
+        return cls(0, 0, 0, 0, 0, 0, item.mode, 0, 0, 0, item.oid, flags, path)
+            
+    @property
+    def stage(self) -> int:
+        return (self.flags >> 12) & 0x3
+
     def update_stat(self, stat_result: os.stat_result) -> None:
         self.ctime = int(stat_result.st_ctime)
         self.ctime_nsec = stat_result.st_ctime_ns
@@ -345,8 +377,8 @@ class Entry:
 
         return result
 
-    def key(self) -> Path:
-        return self.path
+    def key(self) -> tuple[Path, int]:
+        return (self.path, self.stage)
 
 class Checksum:
     class EndOfFile(Exception):
