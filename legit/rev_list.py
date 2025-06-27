@@ -82,17 +82,17 @@ class RevList:
             self.mark_parents_uninteresting(commit)
 
     def mark_parents_uninteresting(self, commit):
-        """
-        Walk up the chain of parents, marking each one ‘uninteresting’,
-        stopping as soon as mark(...) returns False or there’s no parent.
-        """
-        # While we still have a commit and it has a parent...
-        while commit is not None and commit.parent is not None:
-            # If marking the parent fails (already marked), stop.
-            if not self.mark(commit.parent, 'uninteresting'):
-                break
-            # Move up to the parent commit object
-            commit = self.commits.get(commit.parent)
+        queue: list[str] = list(commit.parents)
+
+        while queue:
+            oid = queue.pop(0) 
+
+            if not self.mark(oid, "uninteresting"):
+                continue
+
+            parent_commit = self.commits.get(oid)
+            if parent_commit is not None:
+                queue.extend(parent_commit.parents)
 
     def enqueue_commit(self, commit):
         if not self.mark(commit.oid, "seen"):
@@ -164,23 +164,29 @@ class RevList:
         if not self.mark(commit.oid, "added"):
             return
 
-        parent = self.load_commit(commit.parent)
-    
         if self.is_marked(commit.oid, "uninteresting"):
-            if parent is not None:
+            parents = [self.load_commit(oid) for oid in commit.parents]
+            for parent in parents:
                 self.mark_parents_uninteresting(parent)
         else:
-            self.simplify_commit(commit)
+            parents = [self.load_commit(oid) for oid in self.simplify_commit(commit)]
 
-        if parent is not None:
+        for parent in parents:
             self.enqueue_commit(parent)
 
     def simplify_commit(self, commit):
         if not self.prune:
             return
+        
+        parents = commit.parents
+        parents = [None] if not parents else parents
 
-        diff = self.tree_diff(commit.parent, commit.oid)
-
-        if not diff:
+        for oid in parents:
+            diff = self.tree_diff(oid, commit.oid)
+            if not diff:
+                continue
             self.mark(commit.oid, "treesame")
+            return list(oid)
+
+        return commit.parents
 

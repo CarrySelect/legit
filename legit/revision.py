@@ -30,11 +30,12 @@ class Revision:
             return f"(Ref name={self.name!r})"
 
     class Parent:
-        def __init__(self, rev: Union['Revision.Ref', 'Revision.Parent', 'Revision.Ancestor']) -> None:
+        def __init__(self, rev: Union['Revision.Ref', 'Revision.Parent', 'Revision.Ancestor'], n: int) -> None:
             self.rev = rev
+            self.n = n
         
         def resolve(self, context: 'Revision') -> Optional[str]:
-            return context.commit_parent(self.rev.resolve(context))
+            return context.commit_parent(self.rev.resolve(context), self.n)
         
         def __eq__(self, other: Any) -> bool:
             return isinstance(other, Revision.Parent) and self.rev == other.rev
@@ -78,7 +79,7 @@ class Revision:
           [\x00-\x20*:?\[\\^~\x7f]  # control or disallowed chars
         """, re.X)
 
-    PARENT_PATTERN   = re.compile(r'^(.+)\^$')
+    PARENT_PATTERN   = re.compile(r'^(.+)\^(\d)$')
     ANCESTOR_PATTERN = re.compile(r'^(.+)~(\d+)$')
 
     REF_ALIASES = {
@@ -123,9 +124,9 @@ class Revision:
         # Parent syntax (e.g. "main^")
         m = cls.PARENT_PATTERN.match(revision)
         if m:
-            base = m.group(1)
-            rev = cls.parse(base)
-            return cls.Parent(rev) if rev else None
+            rev = Revision.parse(m.group(1))
+            n = 1 if not m.group(2) else int(m.group(2))
+            return cls.Parent(rev, n) if rev else None
 
         # Ancestor syntax (e.g. "main~3")
         m = cls.ANCESTOR_PATTERN.match(revision)
@@ -142,14 +143,14 @@ class Revision:
         # Invalid
         return None
     
-    def commit_parent(self, oid: str | None) -> Optional[str]:
+    def commit_parent(self, oid: str | None, n: int = 1) -> Optional[str]:
         if oid is None:
             return None
 
         assert oid is not None
 
         commit = self.load_typed_object(oid, Revision.COMMIT)
-        return commit.parent if commit is not None and isinstance(commit, Commit) else None        
+        return commit.parents[n-1] if commit is not None and isinstance(commit, Commit) else None        
     
     def load_typed_object(self, oid: Optional[str], ty: str) -> Optional['Tree | Commit | Blob']:
         if oid is None:
