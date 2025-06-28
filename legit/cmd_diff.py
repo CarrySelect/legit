@@ -72,13 +72,16 @@ class Diff(PrintDiffMixin, Base):
                 self.print_workspace_diff(path)
 
     def print_conflict_diff(self, path: str) -> None:
-        self.println(f"* Unmerged path {path}")
-        
-        target = self.from_index(Path(path), self.stage)
-        if target is None:
-            return
+        targets = [self.from_index(path, stage) for stage in range(4)]
+        left, right = targets[2], targets[3]
 
-        self.print_diff(target, self.from_file(Path(path)))
+        if self.stage:
+            self.println(f"* Unmerged path {path}")
+            self.print_diff(targets[self.stage], self.from_file(path))
+        elif left and right:
+            self.print_combined_diff([left, right], self.from_file(path))
+        else:
+            self.println(f"* Unmerged path {path}")
 
     def print_workspace_diff(self, path: str) -> None:
         state = self.status_state.workspace_changes[path]

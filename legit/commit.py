@@ -12,6 +12,9 @@ class Commit:
         self.message: str = message
         self._oid: str | None = None
 
+    def is_merge(self) -> bool:
+        return len(self.parents) > 1
+    
     @property
     def parent(self):
         try:

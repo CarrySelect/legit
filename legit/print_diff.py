@@ -1,5 +1,5 @@
 from pathlib import Path
-from legit.diff import diff_hunks
+from legit.diff import diff_hunks, combined_hunks
 from legit.hunk import Hunk
 from legit.myers import Edit
 
@@ -23,6 +23,29 @@ class PrintDiffMixin:
             self.patch = True
         if any(x in self.args for x in ("-s", "--no-patch")):
             self.patch = False
+
+    def print_combined_diff(self, a_versions, b_version):
+        self._header(f"diff --cc {b_version.path}")
+    
+        a_oids = [self._short(a.oid) for a in a_versions]
+        oid_range = f"index {','.join(a_oids)}..{self._short(b_version.oid)}"
+        self._header(oid_range)
+    
+        if not all(a.mode == b_version.mode for a in a_versions):
+            a_modes = ",".join(str(a.mode) for a in a_versions)
+            self._header(f"mode {a_modes}..{b_version.mode}")
+    
+        self._header(f"--- a/{b_version.diff_path}")
+    
+        self._header(f"+++ b/{b_version.diff_path}")
+    
+        a_data = [a.data for a in a_versions]
+        b_data = b_version.data
+        hunks = combined_hunks(a_data, b_data)
+    
+        for hunk in hunks:
+            self._print_diff_hunk(hunk)
+
 
     def print_diff(self, a: Target, b: Target) -> None:
         if a.oid == b.oid and a.mode == b.mode:

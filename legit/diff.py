@@ -1,6 +1,7 @@
 from typing import Union, List
 from legit.myers import Edit, Line, Myers
-from legit.hunk import Hunk, filter as filter_hunks
+from legit.hunk import Hunk
+from legit.combined import Combined
 
 
 def lines(document: Union[str, List[str]]) -> List[Line]:
@@ -22,4 +23,12 @@ def diff(a: Union[str, List[str]], b: Union[str, List[str]]) -> List[Edit]:
 
 
 def diff_hunks(a: Union[str, List[str]], b: Union[str, List[str]]) -> List[Hunk]:
-    return filter_hunks(diff(a, b))
+    return Hunk.filter(diff(a, b))
+
+def diff_combined(a_versions, b_version) -> List[Combined.Row]:
+    diffs: List[List[Edit]] = [diff(a, b_version) for a in a_versions]
+    combined_rows = list(Combined(diffs))
+    return combined_rows
+
+def combined_hunks(a_versions, b_version) -> List[Hunk]:
+    return Hunk.filter(diff_combined(a_versions, b_version))

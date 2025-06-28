@@ -1,4 +1,4 @@
-from typing import Generator
+from typing import Generator, Optional
 from legit.cmd_base import Base
 from legit.commit import Commit
 from legit.refs import Refs
@@ -16,17 +16,16 @@ class Log(PrintDiffMixin, Base):
         self.repo: Repository = Repository(self.dir / ".git")
         self.blank_line: bool = False
         
-        # Set default option values
         self.abbrev = None
         self.format = "medium"
         self.decorate = "auto"
         self.patch = False
 
-        # This list will hold only the non-option arguments (revisions and paths)
+        if "--cc" in self.args:
+            self.patch = self.combined = True
+ 
         positional_args = []
 
-        # Manually parse options from self.args and filter them from positional_args
-        # This ensures that only revisions and paths are passed to RevList.
         for arg in self.args:
             if arg == "--oneline":
                 if self.abbrev is None:
@@ -91,8 +90,10 @@ class Log(PrintDiffMixin, Base):
         self.show_patch(commit)
 
     def show_patch(self, commit: Commit) -> None:
-        if not self.patch or len(commit.parents) > 1:
+        if not self.patch:
             return
+        if commit.is_merge():
+            return self.show_merge_patch(commit)
 
         diff = self.rev_list.tree_diff(commit.parent, commit.oid)
         paths = sorted(diff.keys())
@@ -102,6 +103,27 @@ class Log(PrintDiffMixin, Base):
         for path in paths:
             old_item, new_item = diff[path]
             self.print_diff(self.from_diff_item(path, old_item), self.from_diff_item(path, new_item))
+
+    def show_merge_patch(self, commit: Commit) -> Optional[str]:
+        if not self.combined:
+            return
+
+        diffs = [self.rev_list.tree_diff(oid, commit.oid) for oid in commit.parents]
+        if not diffs:
+            return
+
+        paths = [
+            path for path in diffs[0].keys()
+            if all(path in diff for diff in diffs[1:])
+        ]
+
+        self._blank_line()
+
+        for path in paths:
+            parents = [self._from_diff_item(path, diff[path][0]) for diff in diffs]
+            child = self._from_diff_item(path, diffs[0][path][1])
+
+            self.print_combined_diff(parents, child)
 
     def from_diff_item(self, path, item) -> Target:
         if item is not None:
@@ -115,6 +137,11 @@ class Log(PrintDiffMixin, Base):
 
         self._blank_line()
         self.println(self.fmt("yellow", f"commit {self._abbrev(commit)}") + self._decorate(commit))
+
+        if commit.is_merge():
+            oids = [self.repo.database.short_oid(oid) for oid in commit.parents]
+            self.println(f"Merge: {' '.join(oids)}")
+
         self.println(f"Author: {author.name} <{author.email}>")
         self.println(f"Date:   {author.readable_time()}")
         self._blank_line()

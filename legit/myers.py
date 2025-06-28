@@ -24,6 +24,9 @@ class Edit:
         assert line is not None
         return SYMBOLS[self.ty] + line.text
 
+    @property
+    def a_lines(self):
+        return [self.a_line]
 
 class Myers:
     """Myers O((N + M) D) diff algorithm for two sequences."""
