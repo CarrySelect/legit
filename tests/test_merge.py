@@ -346,7 +346,7 @@ class TestConflictedMergeAddAdd:
 
     def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
         cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
-        expected = "AA g.txt"
+        expected = "AA g.txt\n"
         assert_stdout(stdout, expected)
 
     def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
@@ -428,7 +428,7 @@ class TestConflictedMergeAddAddModeConflict:
 
     def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
         cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
-        assert_stdout(stdout, "AA g.txt")
+        assert_stdout(stdout, "AA g.txt\n")
 
     def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
         cmd, stdin, stdout, stderr = legit_cmd("diff")
@@ -580,7 +580,7 @@ class TestConflictedMergeEditEdit:
 
     def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
         cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
-        assert_stdout(stdout, "UU f.txt")
+        assert_stdout(stdout, "UU f.txt\n")
 
     def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
         cmd, stdin, stdout, stderr = legit_cmd("diff")
@@ -617,7 +617,7 @@ class TestConflictedMergeEditDelete:
 
     def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
         cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
-        assert_stdout(stdout, "UD f.txt")
+        assert_stdout(stdout, "UD f.txt\n")
 
     def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
         cmd, stdin, stdout, stderr = legit_cmd("diff")
@@ -654,7 +654,7 @@ class TestConflictedMergeDeleteEdit:
 
     def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
         cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
-        assert_stdout(stdout, "DU f.txt")
+        assert_stdout(stdout, "DU f.txt\n")
 
     def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
         cmd, stdin, stdout, stderr = legit_cmd("diff")
@@ -745,7 +745,7 @@ class TestConflictedMergeEditAddChild:
         assert_no_merge(legit_cmd, load_commit)
 
     def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
-        cmd, stdin, stdout, stderr = legit_cmd("status", "--iporcelain")
+        cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
         expected = textwrap.dedent("""\
             UD nest/f.txt
             A  nest/f.txt/g.txt

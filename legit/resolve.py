@@ -69,7 +69,7 @@ class Resolve:
             rename = f"{parent}~{name}"
             self.untracked[rename] = new_item
 
-            if diff.get(path) is not None:
+            if diff.get(path) is None:
                 self.log(f"Adding {path}")
             
             self.log_conflict(parent, rename)

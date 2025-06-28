@@ -72,7 +72,7 @@ class Status:
                 self.check_index_against_head_tree(entry)
             else:
                 self.changed.add(str(entry.path))
-                self.conflicts[entry.path].append(entry.stage)
+                self.conflicts[str(entry.path)].append(entry.stage)
 
     def check_index_against_workspace(self, entry: Entry) -> None:
         """

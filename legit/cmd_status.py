@@ -143,7 +143,7 @@ class StatusCmd(Base):
     def status_for_path(self, path: str) -> str:
         assert self.status_state is not None
         if path in self.status_state.conflicts:
-            return CONFLICT_SHORT_STATUS[self.status_state.conflicts[path]]
+            return CONFLICT_SHORT_STATUS[tuple(sorted(self.status_state.conflicts[path]))]
         else:
             left = SHORT_STATUS.get(cast(str, self.status_state.index_changes.get(path)), ' ')
             right = SHORT_STATUS.get(cast(str, self.status_state.workspace_changes.get(path)), ' ')

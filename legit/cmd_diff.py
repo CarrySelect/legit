@@ -8,7 +8,8 @@ from legit.blob import Blob
 from legit.hunk import Hunk
 from legit.diff import diff, diff_hunks
 from legit.cmd_color import SGR_CODES, Color
-from legit.print_diff import PrintDiffMixin
+from legit.print_diff import PrintDiffMixin, Target
+
 
 class Diff(PrintDiffMixin, Base):
     NULL_OID = '0' * 40

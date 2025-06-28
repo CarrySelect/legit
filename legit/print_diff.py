@@ -25,7 +25,7 @@ class PrintDiffMixin:
             self.patch = False
 
     def print_diff(self, a: Target, b: Target) -> None:
-        if a.oid == b.oid:
+        if a.oid == b.oid and a.mode == b.mode:
             return
 
         a.path = Path("a") / a.path
