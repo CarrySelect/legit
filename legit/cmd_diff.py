@@ -59,7 +59,8 @@ class Diff(PrintDiffMixin, Base):
         if not self.patch:
             return
     
-        paths = self.status_state.conflicts.copy().update(self.status_state.workspace_changes)
+        paths = self.status_state.conflicts.copy()
+        paths.update(self.status_state.workspace_changes)
 
         for path, state in paths.items():
             if path in self.status_state.conflicts:

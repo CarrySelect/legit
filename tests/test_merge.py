@@ -58,7 +58,8 @@ def merge3(commit_tree, legit_cmd):
         commit_tree("C", right)
 
         legit_cmd("checkout", "master")
-        legit_cmd("merge", "topic", stdin_data="M")
+        cmd, stdin, stdout, stderr = legit_cmd("merge", "topic", stdin_data="M")
+        return cmd, stdin, stdout, stderr
 
     return _merge3
 
@@ -311,11 +312,21 @@ class TestUnconflictedMergeDeleteAddChild:
 class TestConflictedMergeAddAdd:
     @pytest.fixture(autouse=True)
     def setup(self, merge3):
-        merge3(
+        self.cmd, self.stdin, self.stdout, self.stderr = merge3(
             {"f.txt": "1"},
             {"g.txt": "2\n"},
             {"g.txt": "3\n"},
         )
+
+    def test_it_prints_the_merge_conflicts(self):
+        expected = textwrap.dedent(
+            """\
+            Auto-merging g.txt
+            CONFLICT (add/add): Merge conflict in g.txt
+            Automatic merge failed; fix conflicts and then commit the result.
+            """
+        )
+        assert_stdout(self.stdout, expected)
 
     def test_it_puts_the_conflicted_file_in_the_workspace(self, repo_path):
         assert_workspace(repo_path, {
@@ -333,15 +344,128 @@ class TestConflictedMergeAddAdd:
     def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
         assert_no_merge(legit_cmd, load_commit)
 
+    def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
+        expected = "AA g.txt"
+        assert_stdout(stdout, expected)
+
+    def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("diff")
+        expected = "* Unmerged path g.txt\n" 
+        assert_stdout(stdout, expected)
+
+    def test_it_shows_the_diff_against_our_version(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("diff", "--ours")
+        expected = textwrap.dedent(
+            """\
+            * Unmerged path g.txt
+            diff --git a/g.txt b/g.txt
+            index 0cfbf08..2603ab2 100644
+            --- a/g.txt
+            +++ b/g.txt
+            @@ -1,1 +1,5 @@
+            +<<<<<<< HEAD
+             2
+            +=======
+            +3
+            +>>>>>>> topic
+            """
+        )
+        assert_stdout(stdout, expected)
+
+    def test_it_shows_the_diff_against_their_version(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("diff", "--theirs")
+        expected = textwrap.dedent(
+            """\
+            * Unmerged path g.txt
+            diff --git a/g.txt b/g.txt
+            index 00750ed..2603ab2 100644
+            --- a/g.txt
+            +++ b/g.txt
+            @@ -1,1 +1,5 @@
+            +<<<<<<< HEAD
+            +2
+            +=======
+             3
+            +>>>>>>> topic
+            """
+        )
+        assert_stdout(stdout, expected)
+
+class TestConflictedMergeAddAddModeConflict:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        # Simulate an add/add mode conflict on g.txt
+        self.cmd, self.stdin, self.stdout, self.stderr = merge3(
+            {"f.txt": "1"},
+            {"g.txt": "2"},
+            {"g.txt": ["2"]}
+        )
+
+    def test_it_prints_the_merge_conflicts(self):
+        expected = textwrap.dedent("""\
+            Auto-merging g.txt
+            CONFLICT (add/add): Merge conflict in g.txt
+            Automatic merge failed; fix conflicts and then commit the result.
+        """)
+        assert_stdout(self.stdout, expected)
+
+    def test_it_puts_the_conflicted_file_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {
+            "f.txt": "1",
+            "g.txt": "2",
+        })
+
+    def test_it_records_the_conflict_in_the_index(self, repo):
+        assert_index(repo,
+            ("f.txt", 0),
+            ("g.txt", 2),
+            ("g.txt", 3),
+        )
+
+    def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
+        assert_no_merge(legit_cmd, load_commit)
+
+    def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
+        assert_stdout(stdout, "AA g.txt")
+
+    def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("diff")
+        assert_stdout(stdout, "* Unmerged path g.txt\n")
+
+    def test_it_reports_the_mode_change_in_the_appropriate_diff(self, legit_cmd):
+        # When showing minimal diff (-2), only the unmerged marker appears
+        cmd, stdin, stdout, stderr = legit_cmd("diff", "-2")
+        assert_stdout(stdout, "* Unmerged path g.txt\n")
+
+        # When showing full diff (-3), include the mode change details
+        cmd, stdin, stdout, stderr = legit_cmd("diff", "-3")
+        expected = textwrap.dedent("""\
+            * Unmerged path g.txt
+            diff --git a/g.txt b/g.txt
+            old mode 100755
+            new mode 100644
+        """)
+        assert_stdout(stdout, expected)
+
 
 class TestConflictedMergeFileDirectoryAddition:
     @pytest.fixture(autouse=True)
     def setup(self, merge3):
-        merge3(
+        self.cmd, self.stdin, self.stdout, self.stderr = merge3(
             {"f.txt": "1"},
             {"g.txt": "2"},
             {"g.txt/nested.txt": "3"},
         )
+
+    def test_it_prints_the_merge_conflicts(self):
+        expected = textwrap.dedent("""\
+            Adding g.txt/nested.txt
+            CONFLICT (file/directory): There is a directory with name g.txt in topic. Adding g.txt as g.txt~HEAD
+            Automatic merge failed; fix conflicts and then commit the result.
+        """)
+        assert_stdout(self.stdout, expected)
 
     def test_it_puts_a_namespaced_copy_in_the_workspace(self, repo_path):
         assert_workspace(repo_path, {
@@ -360,15 +484,36 @@ class TestConflictedMergeFileDirectoryAddition:
     def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
         assert_no_merge(legit_cmd, load_commit)
 
+    def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
+        expected = textwrap.dedent("""\
+            AU g.txt
+            A  g.txt/nested.txt
+            ?? g.txt~HEAD
+        """)
+        assert_stdout(stdout, expected)
+
+    def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("diff")
+        assert_stdout(stdout, "* Unmerged path g.txt\n")
+
 
 class TestConflictedMergeDirectoryFileAddition:
     @pytest.fixture(autouse=True)
     def setup(self, merge3):
-        merge3(
+        self.cmd, self.stdin, self.stdout, self.stderr = merge3(
             {"f.txt": "1"},
             {"g.txt/nested.txt": "2"},
             {"g.txt": "3"},
         )
+
+    def test_it_prints_the_merge_conflicts_directory_file(self):
+        expected = textwrap.dedent("""\
+            Adding g.txt/nested.txt
+            CONFLICT (directory/file): There is a directory with name g.txt in HEAD. Adding g.txt as g.txt~topic
+            Automatic merge failed; fix conflicts and then commit the result.
+        """)
+        assert_stdout(self.stdout, expected)
 
     def test_it_puts_a_namespaced_copy_in_the_workspace(self, repo_path):
         assert_workspace(repo_path, {
@@ -387,15 +532,36 @@ class TestConflictedMergeDirectoryFileAddition:
     def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
         assert_no_merge(legit_cmd, load_commit)
 
+    
+    def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
+        expected = textwrap.dedent("""\
+            UA g.txt
+            ?? g.txt~topic
+        """)
+        assert_stdout(stdout, expected)
+
+    def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("diff")
+        assert_stdout(stdout, "* Unmerged path g.txt\n")
+
 
 class TestConflictedMergeEditEdit:
     @pytest.fixture(autouse=True)
     def setup(self, merge3):
-        merge3(
+        self.cmd, self.stdin, self.stdout, self.stderr = merge3(
             {"f.txt": "1\n"},
             {"f.txt": "2\n"},
             {"f.txt": "3\n"},
         )
+
+    def test_it_prints_the_merge_conflicts(self):
+        expected = textwrap.dedent("""\
+            Auto-merging f.txt
+            CONFLICT (content): Merge conflict in f.txt
+            Automatic merge failed; fix conflicts and then commit the result.
+        """)
+        assert_stdout(self.stdout, expected)
 
     def test_it_puts_the_conflicted_file_in_the_workspace(self, repo_path):
         assert_workspace(repo_path, {
@@ -412,15 +578,30 @@ class TestConflictedMergeEditEdit:
     def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
         assert_no_merge(legit_cmd, load_commit)
 
+    def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
+        assert_stdout(stdout, "UU f.txt")
+
+    def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("diff")
+        assert_stdout(stdout, "* Unmerged path f.txt\n")
+
 
 class TestConflictedMergeEditDelete:
     @pytest.fixture(autouse=True)
     def setup(self, merge3):
-        merge3(
+        self.cmd, self.stdin, self.stdout, self.stderr = merge3(
             {"f.txt": "1"},
             {"f.txt": "2"},
             {"f.txt": None},
         )
+
+    def test_it_prints_the_merge_conflicts(self):
+        expected = textwrap.dedent("""\
+            CONFLICT (modify/delete): f.txt deleted in topic and modified in HEAD. Version HEAD of f.txt left in tree.
+            Automatic merge failed; fix conflicts and then commit the result.
+        """)
+        assert_stdout(self.stdout, expected)
 
     def test_it_puts_the_left_version_in_the_workspace(self, repo_path):
         assert_workspace(repo_path, {"f.txt": "2"})
@@ -434,15 +615,30 @@ class TestConflictedMergeEditDelete:
     def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
         assert_no_merge(legit_cmd, load_commit)
 
+    def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
+        assert_stdout(stdout, "UD f.txt")
+
+    def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("diff")
+        assert_stdout(stdout, "* Unmerged path f.txt\n")
+
 
 class TestConflictedMergeDeleteEdit:
     @pytest.fixture(autouse=True)
     def setup(self, merge3):
-        merge3(
+        self.cmd, self.stdin, self.stdout, self.stderr = merge3(
             {"f.txt": "1"},
             {"f.txt": None},
             {"f.txt": "3"},
         )
+
+    def test_it_prints_the_merge_conflicts(self):
+        expected = textwrap.dedent("""\
+            CONFLICT (modify/delete): f.txt deleted in HEAD and modified in topic. Version topic of f.txt left in tree.
+            Automatic merge failed; fix conflicts and then commit the result.
+        """)
+        assert_stdout(self.stdout, expected)
 
     def test_it_puts_the_right_version_in_the_workspace(self, repo_path):
         assert_workspace(repo_path, {"f.txt": "3"})
@@ -456,15 +652,30 @@ class TestConflictedMergeDeleteEdit:
     def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
         assert_no_merge(legit_cmd, load_commit)
 
+    def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
+        assert_stdout(stdout, "DU f.txt")
+
+    def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("diff")
+        assert_stdout(stdout, "* Unmerged path f.txt\n")
 
 class TestConflictedMergeEditAddParent:
     @pytest.fixture(autouse=True)
     def setup(self, merge3):
-        merge3(
+        self.cmd, self.stdin, self.stdout, self.stderr = merge3(
             {"nest/f.txt": "1"},
             {"nest/f.txt": "2"},
             {"nest": "3"},
         )
+
+    def test_it_prints_the_merge_conflicts(self):
+        expected = textwrap.dedent("""\
+            CONFLICT (modify/delete): nest/f.txt deleted in topic and modified in HEAD. Version HEAD of nest/f.txt left in tree.
+            CONFLICT (directory/file): There is a directory with name nest in HEAD. Adding nest as nest~topic
+            Automatic merge failed; fix conflicts and then commit the result.
+        """)
+        assert_stdout(self.stdout, expected)
 
     def test_it_puts_a_namespaced_copy_in_the_workspace(self, repo_path):
         assert_workspace(repo_path, {
@@ -482,15 +693,40 @@ class TestConflictedMergeEditAddParent:
     def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
         assert_no_merge(legit_cmd, load_commit)
 
+    def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
+        expected = textwrap.dedent("""\
+            UA nest
+            UD nest/f.txt
+            ?? nest~topic
+        """)
+        assert_stdout(stdout, expected)
+
+    def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("diff")
+        expected = textwrap.dedent("""\
+            * Unmerged path nest
+            * Unmerged path nest/f.txt
+        """)
+        assert_stdout(stdout, expected)
+
 
 class TestConflictedMergeEditAddChild:
     @pytest.fixture(autouse=True)
     def setup(self, merge3):
-        merge3(
+        self.cmd, self.stdin, self.stdout, self.stderr = merge3(
             {"nest/f.txt": "1"},
             {"nest/f.txt": "2"},
             {"nest/f.txt": None, "nest/f.txt/g.txt": "3"},
         )
+
+    def test_it_prints_the_merge_conflicts(self):
+        expected = textwrap.dedent("""\
+            Adding nest/f.txt/g.txt
+            CONFLICT (modify/delete): nest/f.txt deleted in topic and modified in HEAD. Version HEAD of nest/f.txt left in tree at nest/f.txt~HEAD.
+            Automatic merge failed; fix conflicts and then commit the result.
+        """)
+        assert_stdout(self.stdout, expected)
 
     def test_it_puts_a_namespaced_copy_in_the_workspace(self, repo_path):
         assert_workspace(repo_path, {
@@ -508,6 +744,18 @@ class TestConflictedMergeEditAddChild:
     def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
         assert_no_merge(legit_cmd, load_commit)
 
+    def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("status", "--iporcelain")
+        expected = textwrap.dedent("""\
+            UD nest/f.txt
+            A  nest/f.txt/g.txt
+            ?? nest/f.txt~HEAD
+        """)
+        assert_stdout(stdout, expected)
+
+    def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("diff")
+        assert_stdout(stdout, "* Unmerged path nest/f.txt\n")
 
 class TestMultipleCommonAncestors:
     @pytest.fixture(autouse=True)

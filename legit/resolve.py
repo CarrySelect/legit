@@ -120,7 +120,7 @@ class Resolve:
 
     def log_left_right_conflict(self, path: Path) -> None:
         ty = "content" if self.conflicts[path][0] else "add/add"
-        self.log(f"CONFLICT {ty}: Merge conflict in {path}")
+        self.log(f"CONFLICT ({ty}): Merge conflict in {path}")
 
     def log_modify_delete_conflict(self, path: Path, rename: str | None) -> None:
         deleted, modified = self.log_branch_names(path)
