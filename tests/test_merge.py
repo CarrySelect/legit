@@ -1,6 +1,14 @@
-import pytest
+import enum
+import textwrap
 from pathlib import Path
-from tests.conftest import assert_stdout, delete, legit_cmd, load_commit, make_executable
+
+import pytest
+
+from tests.conftest import assert_stdout
+
+
+class FileMode(enum.Enum):
+    EXECUTABLE = enum.auto()
 
 
 def _snapshot_workspace(repo_path: Path) -> dict[str, str]:
@@ -18,10 +26,13 @@ def assert_workspace(repo_path: Path, expected: dict[str, str]):
 
 
 @pytest.fixture
-def commit_tree(write_file, legit_cmd, commit, delete):
+def commit_tree(write_file, legit_cmd, commit, delete, make_executable):
     def _commit_tree(msg: str, files: dict[str, str]):
         for path, contents in files.items():
-            if contents is None:
+            if contents != FileMode.EXECUTABLE:
+                delete(path)
+
+            if contents == FileMode.EXECUTABLE:
                 make_executable(path)
             elif isinstance(contents, str):
                 write_file(path, contents)
@@ -101,125 +112,450 @@ class TestMergingAnAncestor:
         assert_stdout(stdout, "")
 
 
-class TestUnconflictedMergeWithTwoFiles:
+class TestFastForwardMerge:
     @pytest.fixture(autouse=True)
     def setup(self, commit_tree, legit_cmd):
-        # root commit with both files
-        commit_tree(
-            "root",
-            {
-                "f.txt": "1",
-                "g.txt": "1",
-            },
-        )
-
-        # topic branch modifies g.txt
-        legit_cmd("branch", "topic")
-        legit_cmd("checkout", "topic")
-        commit_tree(
-            "right",
-            {
-                "g.txt": "2",
-            },
-        )
-
-        # master modifies f.txt
-        legit_cmd("checkout", "master")
-        commit_tree(
-            "left",
-            {
-                "f.txt": "2",
-            },
-        )
-
-        # perform the merge (supply a merge message on stdin)
-        legit_cmd("merge", "topic", stdin_data="merge topic branch")
-
-    # ---------------------------------------------------------------------
-    def test_puts_the_combined_changes_in_the_workspace(self, repo_path):
-        assert_workspace(
-            repo_path,
-            {
-                "f.txt": "2",
-                "g.txt": "2",
-            },
-        )
-
-    def test_leaves_the_status_clean(self, legit_cmd):
-        cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
-        assert_stdout(stdout, "")
-
-    def test_writes_a_commit_with_correct_parents(self, load_commit):
-        commit     = load_commit("@")     # HEAD
-        old_head   = load_commit("@^")    # first parent
-        merge_head = load_commit("topic") # second parent
-
-        assert commit.parents == [old_head.oid, merge_head.oid]
-
-
-class TestMultipleCommonAncestors:
-    @pytest.fixture(autouse=True)
-    def setup_repo(self, commit_tree, legit_cmd):
-        # Commits on master: A, B, C
         commit_tree("A", {"f.txt": "1"})
         commit_tree("B", {"f.txt": "2"})
         commit_tree("C", {"f.txt": "3"})
 
-        # topic branch off master^  (points to B)
+        legit_cmd("branch", "topic", "@^^")
+        legit_cmd("checkout", "topic")
+
+        self.cmd, self.stdin, self.stdout, self.stderr = legit_cmd("merge", "master", stdin_data="M")
+
+    def test_it_prints_the_fast_forward_message(self, repo, resolve_revision):
+        a, b = map(resolve_revision, ["master^^", "master"])
+        expected = textwrap.dedent(
+            f"""\
+            Updating {repo.database.short_oid(a)}..{repo.database.short_oid(b)}
+            Fast-forward
+            """
+        )
+        assert_stdout(self.stdout, expected)
+    
+    def test_it_updates_the_current_branch_head(self, load_commit, legit_cmd):
+        commit = load_commit("@")
+        assert commit.message == "C"
+
+        cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
+        assert_stdout(stdout, "")
+
+
+class TestUnconflictedMergeWithTwoFiles:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"f.txt": "1", "g.txt": "1"},
+            {"f.txt": "2",             },
+            {              "g.txt": "2"},
+        )
+
+    def test_it_puts_the_combined_changes_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {
+            "f.txt": "2",
+            "g.txt": "2",
+        })
+
+    def test_it_creates_a_clean_merge(self, legit_cmd, load_commit,):
+        assert_clean_merge(legit_cmd, load_commit)
+
+
+@pytest.fixture
+def assert_executable(repo_path):
+    """Assert that a file in the workspace has the executable bit set."""
+
+    def _assert_executable(path: str | Path):
+        full = (repo_path / path).resolve()
+        mode = full.stat().st_mode
+        assert mode & 0o111, f"{path} is not executable"
+
+    return _assert_executable
+
+
+class TestUnconflictedMergeWithDeletedFile:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"f.txt": "1", "g.txt": "1"},
+            {"f.txt": "2"},
+            {"g.txt": None},
+        )
+
+    def test_it_puts_the_combined_changes_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {
+            "f.txt": "2",
+        })
+
+    def test_it_creates_a_clean_merge(self, legit_cmd, load_commit):
+        assert_clean_merge(legit_cmd, load_commit)
+
+
+class TestUnconflictedMergeSameAdditionOnBothSides:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"f.txt": "1"},
+            {"g.txt": "2"},
+            {"g.txt": "2"},
+        )
+
+    def test_it_puts_the_combined_changes_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {
+            "f.txt": "1",
+            "g.txt": "2",
+        })
+
+    def test_it_creates_a_clean_merge(self, legit_cmd, load_commit):
+        assert_clean_merge(legit_cmd, load_commit)
+
+
+class TestUnconflictedMergeSameEditOnBothSides:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"f.txt": "1"},
+            {"f.txt": "2"},
+            {"f.txt": "2"},
+        )
+
+    def test_it_puts_the_combined_changes_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {"f.txt": "2"})
+
+    def test_it_creates_a_clean_merge(self, legit_cmd, load_commit):
+        assert_clean_merge(legit_cmd, load_commit)
+
+
+class TestUnconflictedMergeEditAndModeChange:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"f.txt": "1"},
+            {"f.txt": "2"},
+            {"f.txt": FileMode.EXECUTABLE},
+        )
+
+    def test_it_puts_the_combined_changes_in_the_workspace(self, repo_path, assert_executable):
+        assert_workspace(repo_path, {"f.txt": "2"})
+        assert_executable("f.txt")
+
+    def test_it_creates_a_clean_merge(self, legit_cmd, load_commit):
+        assert_clean_merge(legit_cmd, load_commit)
+
+
+class TestUnconflictedMergeModeChangeAndEdit:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"f.txt": "1"},
+            {"f.txt": FileMode.EXECUTABLE},
+            {"f.txt": "3"},
+        )
+
+    def test_it_puts_the_combined_changes_in_the_workspace(self, repo_path, assert_executable):
+        assert_workspace(repo_path, {"f.txt": "3"})
+        assert_executable("f.txt")
+
+    def test_it_creates_a_clean_merge(self, legit_cmd, load_commit):
+        assert_clean_merge(legit_cmd, load_commit)
+
+
+class TestUnconflictedMergeSameDeletionOnBothSides:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"f.txt": "1", "g.txt": "1"},
+            {"g.txt": None},
+            {"g.txt": None},
+        )
+
+    def test_it_puts_the_combined_changes_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {"f.txt": "1"})
+
+    def test_it_creates_a_clean_merge(self, legit_cmd, load_commit):
+        assert_clean_merge(legit_cmd, load_commit)
+
+
+class TestUnconflictedMergeDeleteAddParent:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"nest/f.txt": "1"},
+            {"nest/f.txt": None},
+            {"nest": "3"},
+        )
+
+    def test_it_puts_the_combined_changes_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {"nest": "3"})
+
+    def test_it_creates_a_clean_merge(self, legit_cmd, load_commit):
+        assert_clean_merge(legit_cmd, load_commit)
+
+
+class TestUnconflictedMergeDeleteAddChild:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"nest/f.txt": "1"},
+            {"nest/f.txt": None},
+            {"nest/f.txt": None, "nest/f.txt/g.txt": "3"},
+        )
+
+    def test_it_puts_the_combined_changes_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {"nest/f.txt/g.txt": "3"})
+
+    def test_it_creates_a_clean_merge(self, legit_cmd, load_commit):
+        assert_clean_merge(legit_cmd, load_commit)
+
+
+class TestConflictedMergeAddAdd:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"f.txt": "1"},
+            {"g.txt": "2"},
+            {"g.txt": ["2"]},
+        )
+
+    def test_it_puts_the_conflicted_file_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {
+            "f.txt": "1",
+            "g.txt": "2",
+        })
+
+    def test_it_records_the_conflict_in_the_index(self, repo):
+        assert_index(repo,
+            ("f.txt", 0),
+            ("g.txt", 2),
+            ("g.txt", 3),
+        )
+
+    def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
+        assert_no_merge(legit_cmd, load_commit)
+
+
+class TestConflictedMergeFileDirectoryAddition:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"f.txt": "1"},
+            {"g.txt": "2"},
+            {"g.txt/nested.txt": "3"},
+        )
+
+    def test_it_puts_a_namespaced_copy_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {
+            "f.txt": "1",
+            "g.txt~HEAD": "2",
+            "g.txt/nested.txt": "3",
+        })
+
+    def test_it_records_the_conflict_in_the_index(self, repo):
+        assert_index(repo,
+            ("f.txt", 0),
+            ("g.txt", 2),
+            ("g.txt/nested.txt", 0),
+        )
+
+    def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
+        assert_no_merge(legit_cmd, load_commit)
+
+
+class TestConflictedMergeDirectoryFileAddition:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"f.txt": "1"},
+            {"g.txt/nested.txt": "2"},
+            {"g.txt": "3"},
+        )
+
+    def test_it_puts_a_namespaced_copy_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {
+            "f.txt": "1",
+            "g.txt~topic": "3",
+            "g.txt/nested.txt": "2",
+        })
+
+    def test_it_records_the_conflict_in_the_index(self, repo):
+        assert_index(repo,
+            ("f.txt", 0),
+            ("g.txt", 3),
+            ("g.txt/nested.txt", 0),
+        )
+
+    def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
+        assert_no_merge(legit_cmd, load_commit)
+
+
+class TestConflictedMergeEditEdit:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"f.txt": "1\n"},
+            {"f.txt": "2\n"},
+            {"f.txt": "3\n"},
+        )
+
+    def test_it_puts_the_conflicted_file_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {
+            "f.txt": "<<<<<<< HEAD\n2\n=======\n3\n>>>>>>> topic\n",
+        })
+
+    def test_it_records_the_conflict_in_the_index(self, repo):
+        assert_index(repo,
+            ("f.txt", 1),
+            ("f.txt", 2),
+            ("f.txt", 3),
+        )
+
+    def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
+        assert_no_merge(legit_cmd, load_commit)
+
+
+class TestConflictedMergeEditDelete:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"f.txt": "1"},
+            {"f.txt": "2"},
+            {"f.txt": None},
+        )
+
+    def test_it_puts_the_left_version_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {"f.txt": "2"})
+
+    def test_it_records_the_conflict_in_the_index(self, repo):
+        assert_index(repo,
+            ("f.txt", 1),
+            ("f.txt", 2),
+        )
+
+    def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
+        assert_no_merge(legit_cmd, load_commit)
+
+
+class TestConflictedMergeDeleteEdit:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"f.txt": "1"},
+            {"f.txt": None},
+            {"f.txt": "3"},
+        )
+
+    def test_it_puts_the_right_version_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {"f.txt": "3"})
+
+    def test_it_records_the_conflict_in_the_index(self, repo):
+        assert_index(repo,
+            ("f.txt", 1),
+            ("f.txt", 3),
+        )
+
+    def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
+        assert_no_merge(legit_cmd, load_commit)
+
+
+class TestConflictedMergeEditAddParent:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"nest/f.txt": "1"},
+            {"nest/f.txt": "2"},
+            {"nest": "3"},
+        )
+
+    def test_it_puts_a_namespaced_copy_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {
+            "nest/f.txt": "2",
+            "nest~topic": "3",
+        })
+
+    def test_it_records_the_conflict_in_the_index(self, repo):
+        assert_index(repo,
+            ("nest", 3),
+            ("nest/f.txt", 1),
+            ("nest/f.txt", 2),
+        )
+
+    def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
+        assert_no_merge(legit_cmd, load_commit)
+
+
+class TestConflictedMergeEditAddChild:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"nest/f.txt": "1"},
+            {"nest/f.txt": "2"},
+            {"nest/f.txt": None, "nest/f.txt/g.txt": "3"},
+        )
+
+    def test_it_puts_a_namespaced_copy_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {
+            "nest/f.txt~HEAD": "2",
+            "nest/f.txt/g.txt": "3",
+        })
+
+    def test_it_records_the_conflict_in_the_index(self, repo):
+        assert_index(repo,
+            ("nest/f.txt", 1),  # missing
+            ("nest/f.txt", 2),
+            ("nest/f.txt/g.txt", 0),
+        )
+
+    def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
+        assert_no_merge(legit_cmd, load_commit)
+
+
+class TestMultipleCommonAncestors:
+    @pytest.fixture(autouse=True)
+    def setup(self, commit_tree, legit_cmd):
+        # Build the commit graph out as described in the original Ruby spec.
+        commit_tree("A", {"f.txt": "1"})
+        commit_tree("B", {"f.txt": "2"})
+        commit_tree("C", {"f.txt": "3"})
+
         legit_cmd("branch", "topic", "master^")
         legit_cmd("checkout", "topic")
         commit_tree("D", {"g.txt": "1"})
         commit_tree("E", {"g.txt": "2"})
         commit_tree("F", {"g.txt": "3"})
 
-        # joiner branch off topic^ (points to E)
         legit_cmd("branch", "joiner", "topic^")
         legit_cmd("checkout", "joiner")
         commit_tree("G", {"h.txt": "1"})
 
-        # back to master for the actual tests
         legit_cmd("checkout", "master")
 
-    # ---------------------------------------------------------------------
-    def test_performs_the_first_merge(self, repo_path, legit_cmd):
-        cmd, _, _, _ = legit_cmd("merge", "joiner", stdin_data="merge joiner")
-        assert cmd.status == 0 
-
-        assert_workspace(
-            repo_path,
-            {
-                "f.txt": "3",
-                "g.txt": "2",
-                "h.txt": "1",
-            },
-        )
-
-        cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
-        assert_stdout(stdout, "")
-
-    # ---------------------------------------------------------------------
-    def test_performs_the_second_merge(self, repo_path, legit_cmd, commit_tree):
-        # First merge (same as previous test)
-        legit_cmd("merge", "joiner", stdin_data="merge joiner")
-
-        # New commit H on master
-        commit_tree("H", {"f.txt": "4"})
-
-        # Second merge, bringing in topic
-        cmd, _, _, _ = legit_cmd("merge", "topic", stdin_data="merge topic")
+    def test_it_performs_the_first_merge(self, legit_cmd, repo_path):
+        cmd, stdin, stdout, stderr = legit_cmd("merge", "joiner", stdin_data="merge joiner")
         assert cmd.status == 0
 
-        assert_workspace(
-            repo_path,
-            {
-                "f.txt": "4",
-                "g.txt": "3",
-                "h.txt": "1",
-            },
-        )
+        assert_workspace(repo_path, {
+            "f.txt": "3",
+            "g.txt": "2",
+            "h.txt": "1",
+        })
 
         cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
         assert_stdout(stdout, "")
 
+    def test_it_performs_the_second_merge(self, legit_cmd, commit_tree, repo_path):
+        legit_cmd("merge", "joiner", stdin_data="merge joiner")
 
+        commit_tree("H", {"f.txt": "4"})
+        
+        cmd, stdin, stdout, stderr = legit_cmd("merge", "topic", stdin_data="merge topic")
+        assert cmd.status == 0
+
+        assert_workspace(repo_path, {
+            "f.txt": "4",
+            "g.txt": "3",
+            "h.txt": "1",
+        })
+
+        cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
+        assert_stdout(stdout, "")
 
