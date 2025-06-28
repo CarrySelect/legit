@@ -17,6 +17,12 @@ class Resolve:
         self.add_conflicts_to_index()
         self.write_untracked_files()
 
+    def on_progress(self, block):
+        self.on_progress = block
+
+    def log(self, message: str) -> None:
+        self.on_progress(message)
+
     def write_untracked_files(self) -> None:
         for path, item in self.untracked.items():
             blob = self.repo.database.load(item.oid)
@@ -63,6 +69,11 @@ class Resolve:
             rename = f"{parent}~{name}"
             self.untracked[rename] = new_item
 
+            if not diff[path]:
+                self.log(f"Adding {path}")
+            
+            self.log_conflict(parent, rename)
+
     def same_path_conflict(self, path: Path, base: DatabaseEntry, right: DatabaseEntry) -> None:
         if path in self.conflicts:
             return
@@ -74,6 +85,9 @@ class Resolve:
         left = self.left_diff[path][1]
         if left == right:
             return
+
+        if left is not None and right is not None:
+            self.log(f"Auto-merging {path}")
 
         oid_ok, oid = self.merge_blobs(
             base.oid if base is not None else None,
@@ -88,9 +102,45 @@ class Resolve:
         )
 
         self.clean_diff[path] = [left, DatabaseEntry(oid, mode)]
+        if oid_ok and mode_ok:
+            return
         
-        if not (oid_ok and mode_ok):
-            self.conflicts[path] = [base, left, right]
+        self.conflicts[path] = [base, left, right]
+        self.log_conflict(path)
+
+    def log_conflict(self, path, rename: str | None = None) -> None:
+        base, left, right = self.conflicts[path]
+
+        if left and right:
+            self.log_left_right_conflict(path)
+        elif base and (left or right):
+            self.log_modify_delete_conflict(path, rename)
+        else:
+            self.log_file_directory_conflict(path, rename)
+
+    def log_left_right_conflict(self, path: Path) -> None:
+        ty = "content" if self.conflicts[path][0] else "add/add"
+        self.log(f"CONFLICT {ty}: Merge conflict in {path}")
+
+    def log_modify_delete_conflict(self, path: Path, rename: str | None) -> None:
+        deleted, modified = self.log_branch_names(path)
+        rename = " at {rename}" if rename is not None else ""
+
+        self.log(f"CONFLICT (modify/delete): {path}" +
+                 f"deleted in {deleted} and modified in {modified}. " +
+                 f"Version {modified} of {path} left in tree{rename}.")
+
+    def log_file_directory_conflict(self, path: Path, rename: str | None) -> None:
+        ty = "file/directory" if self.conflicts[path][1] else "directory/file"
+        branch, _ = self.log_branch_names(path)
+
+        self.log(f"CONFLICT ({ty}): There is a directory " +
+                 f"with name {path} in {branch}. " +
+                 f"Adding {path} as {rename}")
+
+    def log_branch_names(self, path: Path) -> tuple[str, str]:
+        a, b = self.inputs.left_name, self.inputs.right_name
+        return (b, a) if self.conflicts[path][1] else (a, b)
 
     def merge_blobs(self, base_oid, left_oid, right_oid):
         result = self.merge3(base_oid, left_oid, right_oid)

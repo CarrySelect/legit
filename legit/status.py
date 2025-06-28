@@ -1,3 +1,4 @@
+from collections import defaultdict
 import os
 import stat
 from pathlib import Path
@@ -28,6 +29,7 @@ class Status:
         self.workspace_changes: MutableMapping[str, str] = {}
         self.changed: set[str] = set()
         self.untracked: set[str] = set()
+        self.conflicts = defaultdict(list)
 
         self.scan_workspace()
         self.load_head_tree()
@@ -65,8 +67,12 @@ class Status:
 
     def check_index_entries(self) -> None:
         for name, entry in self.repo.index.entries.items():
-            self.check_index_against_workspace(entry)
-            self.check_index_against_head_tree(entry)
+            if entry.stage == 0:
+                self.check_index_against_workspace(entry)
+                self.check_index_against_head_tree(entry)
+            else:
+                self.changed.add(str(entry.path))
+                self.conflicts[entry.path].append(entry.stage)
 
     def check_index_against_workspace(self, entry: Entry) -> None:
         """

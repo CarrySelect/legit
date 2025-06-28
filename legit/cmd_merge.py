@@ -29,10 +29,12 @@ class Merge(WriteCommitMixin, Base):
         self.repo.index.load_for_update()
         
         merge = Resolve(self.repo, self.inputs)
+        merge.on_progress(lambda info: self.println(info))
         merge.execute()
 
         self.repo.index.write_updates()
         if self.repo.index.is_conflict():
+            self.println("Automatic merge failed; fix conflicts and then commit the result.")
             self.exit(1)
 
     def commit_merge(self) -> None:
