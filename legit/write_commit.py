@@ -1,7 +1,16 @@
+import textwrap
 from datetime import datetime
 from legit.author import Author
 from legit.commit import Commit as CommitObject
 from legit.tree import Tree
+
+
+CONFLICT_MESSAGE: str = textwrap.dedent("""\
+    hint: Fix them up in the work tree, then use 'legit add <file>'
+    hint: as appropriate to mark resolution and make a commit.
+    fatal: Exiting because of an unresolved conflict.
+""")
+
 
 class WriteCommitMixin:
     def write_commit(self, parents, message):
@@ -22,5 +31,23 @@ class WriteCommitMixin:
         root = Tree.from_entries(self.repo.index.entries)
         root.traverse(lambda tree: self.repo.database.store(tree))
         return root
+
+    def resume_merge(self):
+        self.handle_conflicted_index()
+        parents = [self.repo.refs.read_head(), self.pending_commit.merge_oid]
+        self.write_commit(parents, self.pending_commit.merge_message)
+        self.pending_commit.clear()
+        self.exit(0)
+
+    def handle_conflicted_index(self) -> None:
+        if not self.repo.index.is_conflict():
+            return
+
+        message = "Committing is not possible because you have unmerged files"
+        self.stderr.write(f"error: {message}." + '\n')
+        self.stderr.write(CONFLICT_MESSAGE + '\n')
+
+        self.exit(128)
+
 
 

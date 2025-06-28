@@ -16,6 +16,10 @@ class Commit(WriteCommitMixin, Base):
         self.repo = Repository(self.dir / ".git")
         
         self.repo.index.load()
+
+        if self.repo.pending_commit().is_in_progress():
+            self.resume_merge()
+
         parent = self.repo.refs.read_head()
         message: str = self.stdin.read()
         commit = self.write_commit([parent] if parent else [], message)

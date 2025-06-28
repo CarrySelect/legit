@@ -23,6 +23,13 @@ class Diff(PrintDiffMixin, Base):
         else:
             self.cached = False
 
+        if any(x in self.args for x in ("-1", "--base")):
+            self.stage = 1
+        elif any(x in self.args for x in ("-2", "--ours")):
+            self.stage = 2
+        elif any(x in self.args for x in ("-3", "--theirs")):
+            self.stage = 3
+
         self.repo: Repository = Repository(self.dir / ".git")
         self.repo.index.load()
         self.status_state: Status = self.repo.status() 
@@ -51,12 +58,30 @@ class Diff(PrintDiffMixin, Base):
     def diff_index_workspace(self) -> None:
         if not self.patch:
             return
+    
+        paths = self.status_state.conflicts.copy().update(self.status_state.workspace_changes)
 
-        for path, state in self.status_state.workspace_changes.items():
-            if state == 'modified':
-                self.print_diff(self.from_index(Path(path)), self.from_file(Path(path)))
-            elif state == 'deleted':
-                self.print_diff(self.from_index(Path(path)), self.from_nothing(Path(path)))
+        for path, state in paths.items():
+            if path in self.status_state.conflicts:
+                self.print_conflict_diff(path)
+            else:
+                self.print_workspace_diff(path)
+
+    def print_conflict_diff(self, path: str) -> None:
+        self.println(f"Unmerged path {path}")
+        
+        target = self.from_index(Path(path), self.stage)
+        if target is None:
+            return
+
+        self.print_diff(target, self.from_file(Path(path)))
+
+    def print_workspace_diff(self, path: str) -> None:
+        state = self.status_state.workspace_changes[path]
+        if state == 'modified':
+            self.print_diff(self.from_index(Path(path)), self.from_file(Path(path)))
+        elif state == 'deleted':
+            self.print_diff(self.from_index(Path(path)), self.from_nothing(Path(path)))
     
     def from_head(self, path: Path) -> 'Target':
         entry = self.status_state.head_tree[path]
@@ -64,9 +89,11 @@ class Diff(PrintDiffMixin, Base):
         assert isinstance(blob, Blob)
         return Target(path, entry.oid, oct(entry.mode)[2:], blob.data)
 
-    def from_index(self, path: Path) -> 'Target':
-        entry = self.repo.index.entry_for_path(path)
-        assert entry is not None
+    def from_index(self, path: Path, stage: int = 0) -> 'Target':
+        entry = self.repo.index.entry_for_path(path, stage)
+        if entry is None:
+            return
+
         blob = self.repo.database.load(entry.oid)
         assert isinstance(blob, Blob)
         return Target(path, entry.oid, oct(entry.mode())[2:], blob.data)

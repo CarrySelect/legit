@@ -71,6 +71,9 @@ class Index:
         self.lockfile.rollback()
 
     def add(self, path: Path, oid: str, stat: os.stat_result) -> None:
+        for stage in range(1, 4):
+            self.remove_entry_with_stage(path, stage)
+
         path = Path(path) if not isinstance(path, Path) else path
         entry: Entry = Entry.create(path, oid, stat)
         self.discard_conflicts(entry)

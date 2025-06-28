@@ -1,16 +1,29 @@
 from legit.cmd_base import Base
-from legit.repository import Repository
+from legit.repository import Repository, PendingCommit
 from legit.revision import Revision
 from legit.common_ancestors import CommonAncestors
 from legit.write_commit import WriteCommitMixin
 from legit.bases import Bases
 from legit.inputs import Inputs
 from legit.resolve import Resolve
+from legit.write_commit import CONFLICT_MESSAGE
 
 
 class Merge(WriteCommitMixin, Base):
     def run(self) -> None:
         self.repo = Repository(self.dir / ".git")
+        self.pending_commit: PendingCommit = self.repo.pending_commit()
+
+        self.mode = "run"
+
+        if "--continue" in self.args:
+            self.mode = "continue"
+         
+        if self.mode == "--continue":
+            self.handle_continue()
+ 
+        if self.pending_commit.is_in_progress():
+            self.handle_in_progress_merge()
 
         self.inputs = Inputs(self.repo, "HEAD", self.args[0])
 
@@ -19,11 +32,27 @@ class Merge(WriteCommitMixin, Base):
 
         if self.inputs.are_fast_forward():
             self.handle_fast_forward()
-
+        
+        self.pending_commit.start(self.inputs.right_oid, self.stdin.read())
+       
         self.resolve_merge()
         self.commit_merge()
         
         self.exit(0)
+
+    def handle_continue(self) -> None:
+        self.repo.index.load()
+        try:
+            self.resume_merge()
+        except PendingCommit.Error as e:
+            self.stderr.write(f"fatal: {e}")
+            self.exit(128)
+
+    def handle_in_progress_merge(self) -> None:
+        message = "Merging is not possible because you have unmerged files"
+        self.stderr.write(f"error: {message}")
+        self.stderr.write(CONFLICT_MESSAGE)
+        self.exit(128)
 
     def resolve_merge(self) -> None:
         self.repo.index.load_for_update()
@@ -39,8 +68,9 @@ class Merge(WriteCommitMixin, Base):
 
     def commit_merge(self) -> None:
         parents = [self.inputs.left_oid, self.inputs.right_oid]
-        message = self.stdin.read()
+        message = self.pending_commit.merge_message
         self.write_commit(parents, message)
+        self.pending_commit.clear()
 
     def handle_merged_ancestor(self) -> None:
         self.println("Already up to date.")
