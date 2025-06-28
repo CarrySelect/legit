@@ -3,6 +3,7 @@ from legit.blob import Blob
 from legit.repository import Repository
 from legit.inputs import Inputs
 from legit.tree import DatabaseEntry
+from legit.diff3 import Diff3
 
 
 class Resolve:
@@ -147,10 +148,19 @@ class Resolve:
         if result is not None:
             return result
 
-        blob = Blob(self.merged_data(left_oid, right_oid))
+        oids = [base_oid, left_oid, right_oid]
+        blobs = [
+            self.repo.database.load(oid).data if oid is not None else ""
+            for oid in oids
+        ]
+        merge = Diff3.merge(*blobs)
+
+        data = merge.to_string(self.inputs.left_name, self.inputs.right_name)
+
+        blob = Blob(data)
         self.repo.database.store(blob)
 
-        return [False, blob.oid]
+        return [merge.is_clean(), blob.oid]
 
     def merged_data(self, left_oid, right_oid):
         left_blob = self.repo.database.load(left_oid)
