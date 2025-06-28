@@ -97,7 +97,7 @@ class StatusCmd(Base):
     def print_long_format(self) -> None:
         assert self.status_state is not None
         self.print_changes("Changes to be committed", self.status_state.index_changes, 'green')
-        self.print_changes("Unmerged paths", self.status_state.conflicts, "red", "conflict") 
+        self.print_changes("Unmerged paths", {p: '' for p in sorted(self.status_state.conflicts)}, "red", "conflict") 
         self.print_changes("Changes not staged for commit", self.status_state.workspace_changes, 'red')
         self.print_changes("Untracked files", {p: '' for p in sorted(self.status_state.untracked)}, 'red')
 

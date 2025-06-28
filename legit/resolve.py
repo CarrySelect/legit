@@ -124,9 +124,9 @@ class Resolve:
 
     def log_modify_delete_conflict(self, path: Path, rename: str | None) -> None:
         deleted, modified = self.log_branch_names(path)
-        rename = " at {rename}" if rename is not None else ""
+        rename = f" at {rename}" if rename is not None else ""
 
-        self.log(f"CONFLICT (modify/delete): {path}" +
+        self.log(f"CONFLICT (modify/delete): {path} " +
                  f"deleted in {deleted} and modified in {modified}. " +
                  f"Version {modified} of {path} left in tree{rename}.")
 

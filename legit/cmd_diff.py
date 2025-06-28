@@ -29,6 +29,8 @@ class Diff(PrintDiffMixin, Base):
             self.stage = 2
         elif any(x in self.args for x in ("-3", "--theirs")):
             self.stage = 3
+        else:
+            self.stage = None
 
         self.repo: Repository = Repository(self.dir / ".git")
         self.repo.index.load()
@@ -69,7 +71,7 @@ class Diff(PrintDiffMixin, Base):
                 self.print_workspace_diff(path)
 
     def print_conflict_diff(self, path: str) -> None:
-        self.println(f"Unmerged path {path}")
+        self.println(f"* Unmerged path {path}")
         
         target = self.from_index(Path(path), self.stage)
         if target is None:
