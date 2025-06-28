@@ -126,7 +126,7 @@ class Index:
         header: bytes = struct.pack(Index.HEADER_FORMAT, Index.SIGNATURE, Index.VERSION, len(self.entries))
         writer.write(header)
 
-        for _, v in sorted(self.entries.items(), key=lambda x: x[1].path):
+        for _, v in sorted(self.entries.items()):
             writer.write(v.to_bytes())
 
         writer.write_checksum()

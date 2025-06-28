@@ -313,14 +313,14 @@ class TestConflictedMergeAddAdd:
     def setup(self, merge3):
         merge3(
             {"f.txt": "1"},
-            {"g.txt": "2"},
-            {"g.txt": ["2"]},
+            {"g.txt": "2\n"},
+            {"g.txt": "3\n"},
         )
 
     def test_it_puts_the_conflicted_file_in_the_workspace(self, repo_path):
         assert_workspace(repo_path, {
             "f.txt": "1",
-            "g.txt": "2",
+            "g.txt": "<<<<<<< HEAD\n2\n=======\n3\n>>>>>>> topic\n",
         })
 
     def test_it_records_the_conflict_in_the_index(self, repo):

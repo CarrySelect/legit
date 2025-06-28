@@ -47,7 +47,7 @@ class Resolve:
 
 
     def file_dir_conflict(self, path, diff, name: str) -> None:
-        for parent in path.parent.parents:
+        for parent in path.parents:
             old_item, new_item = diff.get(parent, (None, None))
             if not new_item:
                 continue
@@ -56,13 +56,17 @@ class Resolve:
                 self.conflicts[parent] = [old_item, new_item, None]
             elif name == self.inputs.right_name:
                 self.conflicts[parent] = [old_item, None, new_item]
-    
-            self.clean_diff.pop(parent, None)
+            
+            if parent in self.clean_diff:
+                del self.clean_diff[parent]
     
             rename = f"{parent}~{name}"
             self.untracked[rename] = new_item
 
     def same_path_conflict(self, path: Path, base: DatabaseEntry, right: DatabaseEntry) -> None:
+        if path in self.conflicts:
+            return
+
         if path not in self.left_diff:
             self.clean_diff[path] = [base, right]
             return
