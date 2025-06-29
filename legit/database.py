@@ -49,7 +49,7 @@ class Database:
         for name in path.parts:
             if not entry:
                 break
-            entry = self.load(entry.oid).entries[name]
+            entry = self.load(entry.oid).entries.get(name)
         return entry
 
     def load_tree_list(self, oid: Optional[str], path: Optional[Path] = None):

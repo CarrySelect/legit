@@ -32,7 +32,7 @@ class TestRmSingleFile:
     def test_removes_file_from_index(self, legit_cmd, repo):
         legit_cmd("rm", "f.txt")
         repo.index.load()
-        assert not repo.index.is_tracked_file("f.txt")
+        assert not repo.index.is_tracked_file(Path("f.txt"))
 
     def test_removes_file_from_workspace(self, legit_cmd, repo_path):
         legit_cmd("rm", "f.txt")
@@ -43,7 +43,7 @@ class TestRmSingleFile:
         cmd, _, _, _ = legit_cmd("rm", "f.txt")
         assert cmd.status == 0
         repo.index.load()
-        assert not repo.index.is_tracked_file("f.txt")
+        assert not repo.index.is_tracked_file(Path("f.txt"))
 
     def test_fails_if_file_not_in_index(self, legit_cmd):
         cmd, _, _, stderr = legit_cmd("rm", "nope.txt")
@@ -59,7 +59,7 @@ class TestRmSingleFile:
             "    f.txt\n"
         ))
         repo.index.load()
-        assert repo.index.is_tracked_file("f.txt")
+        assert repo.index.is_tracked_file(Path("f.txt"))
         assert_workspace(repo_path, {"f.txt": "2"})
 
     def test_fails_if_file_has_uncommitted_changes(self, write_file, legit_cmd, repo, repo_path):
@@ -72,14 +72,14 @@ class TestRmSingleFile:
             "    f.txt\n"
         ))
         repo.index.load()
-        assert repo.index.is_tracked_file("f.txt")
+        assert repo.index.is_tracked_file(Path("f.txt"))
         assert_workspace(repo_path, {"f.txt": "2"})
 
     def test_forces_removal_of_unstaged_changes(self, write_file, legit_cmd, repo, repo_path):
         write_file("f.txt", "2")
         legit_cmd("rm", "-f", "f.txt")
         repo.index.load()
-        assert not repo.index.is_tracked_file("f.txt")
+        assert not repo.index.is_tracked_file(Path("f.txt"))
         assert_workspace(repo_path, {})
 
     def test_forces_removal_of_uncommitted_changes(self, write_file, legit_cmd, repo, repo_path):
@@ -87,20 +87,20 @@ class TestRmSingleFile:
         legit_cmd("add", "f.txt")
         legit_cmd("rm", "-f", "f.txt")
         repo.index.load()
-        assert not repo.index.is_tracked_file("f.txt")
+        assert not repo.index.is_tracked_file(Path("f.txt"))
         assert_workspace(repo_path, {})
 
     def test_removes_file_only_from_index(self, legit_cmd, repo, repo_path):
         legit_cmd("rm", "--cached", "f.txt")
         repo.index.load()
-        assert not repo.index.is_tracked_file("f.txt")
+        assert not repo.index.is_tracked_file(Path("f.txt"))
         assert_workspace(repo_path, {"f.txt": "1"})
 
     def test_removes_index_with_unstaged_changes(self, write_file, legit_cmd, repo, repo_path):
         write_file("f.txt", "2")
         legit_cmd("rm", "--cached", "f.txt")
         repo.index.load()
-        assert not repo.index.is_tracked_file("f.txt")
+        assert not repo.index.is_tracked_file(Path("f.txt"))
         assert_workspace(repo_path, {"f.txt": "2"})
 
     def test_removes_index_with_uncommitted_changes(self, write_file, legit_cmd, repo, repo_path):
@@ -108,7 +108,7 @@ class TestRmSingleFile:
         legit_cmd("add", "f.txt")
         legit_cmd("rm", "--cached", "f.txt")
         repo.index.load()
-        assert not repo.index.is_tracked_file("f.txt")
+        assert not repo.index.is_tracked_file(Path("f.txt"))
         assert_workspace(repo_path, {"f.txt": "2"})
 
     def test_does_not_remove_with_both_unstaged_and_uncommitted(self, write_file, legit_cmd, repo, repo_path):
@@ -122,7 +122,7 @@ class TestRmSingleFile:
             "    f.txt\n"
         ))
         repo.index.load()
-        assert repo.index.is_tracked_file("f.txt")
+        assert repo.index.is_tracked_file(Path("f.txt"))
         assert_workspace(repo_path, {"f.txt": "3"})
 
 

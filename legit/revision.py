@@ -104,6 +104,8 @@ class Revision:
 
         if oid is not None:
             return oid
+
+        print(f"oid is: {oid}")
         
         raise Revision.InvalidObject(f"Not a valid object name: '{self.expr}'.")
 
