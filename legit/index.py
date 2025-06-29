@@ -36,6 +36,10 @@ class Index:
         self.changed: bool = False
         self.parents: dict[Path, set[Path]] = defaultdict(set)
 
+    def add_from_db(self, path: Path, item) -> None:
+        self.store_entry(Entry.create_from_db(path, item, 0))
+        self.changed = True
+
     def child_paths(self, path: Path) -> list[Path]:
         return list(self.parents[path])
 

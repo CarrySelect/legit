@@ -52,6 +52,26 @@ class Database:
             entry = self.load(entry.oid).entries[name]
         return entry
 
+    def load_tree_list(self, oid: Optional[str], path: Optional[Path]):
+        if oid is None:
+            return {}
+
+        entry = self.load_tree_entry(oid, path)
+        thing = {}
+        self.build_list(thing, entry, path if path is not None else Path())
+        return thing
+
+    def build_list(self, thing, entry, prefix: Path):
+        if entry is None:
+            return
+
+        if not entry.is_tree():
+            thing[str(prefix)] = entry
+            return entry
+        
+        for name, item in self.load(entry.oid).entries.items():
+            self.build_list(thing, item, prefix / name)
+    
     def store(self, obj: Blob | Commit | Tree) -> None:
         content = self.serialize_object(obj)
         obj.oid = self.hash_content(content)

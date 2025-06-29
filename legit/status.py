@@ -30,9 +30,9 @@ class Status:
         self.changed: set[str] = set()
         self.untracked: set[str] = set()
         self.conflicts = defaultdict(list)
+        self.head_tree = self.repo.database.load_tree_list(self.repo.refs.read_head())
 
         self.scan_workspace()
-        self.load_head_tree()
         self.check_index_entries()
         self.collect_deleted_head_files()
 
@@ -40,18 +40,6 @@ class Status:
         for path in self.head_tree.keys():
             if not self.repo.index.is_tracked_file(path):
                 self.record_change(path, self.index_changes, "deleted")
-
-    def load_head_tree(self) -> None:
-        self.head_tree: dict[Path, DatabaseEntry] = {}
-        
-        head_oid = self.repo.refs.read_head()
-        if head_oid is None:
-            return
-
-        commit = self.repo.database.load(head_oid)
-        assert isinstance(commit, Commit)
-
-        self.read_tree(commit.tree)
 
     def read_tree(self, tree_oid: str, pathname: str ='') -> None:
         tree = self.repo.database.load(tree_oid)
