@@ -20,7 +20,13 @@ class Workspace:
 
     def __init__(self, path: Path) -> None:
         self.path: Path = path
-
+    
+    def remove(self, path: Path) -> None:
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+    
     def write_file(self, path: Path, data: str) -> None:
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
         with os.fdopen(os.open(self.path / path, flags, 0o644), "w") as f:
@@ -37,7 +43,24 @@ class Workspace:
 
         self.apply_change_list(migration, "update")
         self.apply_change_list(migration, "create")
-      
+   
+    def remove(self, path: str):
+        try:
+            relative_path = Path(path)
+
+            full_path_to_file = self.path / relative_path
+            full_path_to_file.unlink()
+
+            for parent_dir_part in relative_path.parents:
+                if str(parent_dir_part) == '.':
+                    continue
+                
+                full_path_to_dir = self.path / parent_dir_part
+                self.remove_directory(full_path_to_dir)
+
+        except FileNotFoundError:
+            pass
+
     def _rm_rf(self, path: Path) -> None:
        try:
            if path.is_dir():

@@ -15,6 +15,7 @@ from legit.cmd_branch import Branch
 from legit.cmd_checkout import Checkout
 from legit.cmd_log import Log
 from legit.cmd_merge import Merge
+from legit.cmd_rm import Rm
 
 
 class Command:
@@ -31,6 +32,7 @@ class Command:
         "checkout": Checkout,
         "log": Log,
         "merge": Merge,
+        "rm": Rm,
     }
 
     @staticmethod

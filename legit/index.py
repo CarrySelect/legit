@@ -36,6 +36,12 @@ class Index:
         self.changed: bool = False
         self.parents: dict[Path, set[Path]] = defaultdict(set)
 
+    def child_paths(self, path: Path) -> list[Path]:
+        return list(self.parents[path])
+
+    def is_tracked_directory(self, path: Path) -> bool:
+        return path in self.parents
+
     def is_conflict(self) -> bool:
         return any(stage > 0 for _, stage in self.entries)
 

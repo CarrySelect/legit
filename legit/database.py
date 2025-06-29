@@ -19,6 +19,7 @@ TYPES: MutableMapping[str, Type[Blob | Commit | Tree]] = {
 }
 
 
+
 class Database:
     def __init__(self, path: Path) -> None:
         self.path: Path = path
@@ -33,6 +34,23 @@ class Database:
         obj = self.read_object(oid)
         self.objects[oid] = obj
         return obj
+
+    def load_tree_entry(self, oid: str, path: Optional[Path]) -> DatabaseEntry:
+        commit = self.load(oid)
+        root = DatabaseEntry(commit.tree, 0o40000)
+
+        if path is None:
+            return root
+
+        return self.traverse_path_loop(path, root)
+
+    def traverse_path_loop(self, path: Path, root) -> DatabaseEntry:
+        entry = root
+        for name in path.parts:
+            if not entry:
+                break
+            entry = self.load(entry.oid).entries[name]
+        return entry
 
     def store(self, obj: Blob | Commit | Tree) -> None:
         content = self.serialize_object(obj)

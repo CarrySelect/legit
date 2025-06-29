@@ -203,6 +203,44 @@ def merge(refs: tuple[str, ...]) -> None:
     cmd_args.extend(refs)
     run_cmd(*cmd_args)
 
+@cli.command()
+@click.option(
+    "-r",
+    "recursive",
+    is_flag=True,
+    help="Remove directories and their contents recursively."
+)
+@click.option(
+    "--cached",
+    is_flag=True,
+    help="Remove from the index, not from the working tree."
+)
+@click.option(
+    "-f",
+    "--force",
+    "force",
+    is_flag=True,
+    help="Ignore nonexistent files and arguments, never prompt."
+)
+@click.argument("paths", nargs=-1, required=True)
+def rm(recursive: bool, cached: bool, force: bool, paths: tuple[str, ...]) -> None:
+    """
+    Remove files or directories.
+
+    By default, `rm` removes paths from both the working tree and index.
+    """
+    cmd_args = ["rm"]
+
+    if recursive:
+        cmd_args.append("-r")
+    if cached:
+        cmd_args.append("--cached")
+    if force:
+        cmd_args.append("-f")
+
+    cmd_args.extend(paths)
+    run_cmd(*cmd_args)
+
 
 if __name__ == '__main__':
     cli()
