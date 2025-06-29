@@ -18,7 +18,7 @@ class Reset(Base):
         self.reset_files()
         self.repo.index.write_updates()
 
-        if not self.args:
+        if not self.args and self.commit_oid is not None:
             head_oid = self.repo.refs.update_head(self.commit_oid)
             self.repo.refs.update_ref("ORIG_HEAD", head_oid)
 
