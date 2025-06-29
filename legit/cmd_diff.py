@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import reveal_type
 from legit.cmd_base import Base
 from legit.index import Entry, Index
 from legit.myers import Edit
@@ -16,7 +17,6 @@ class Diff(PrintDiffMixin, Base):
 
     def run(self) -> None:
         self.patch = True
-
         self.define_print_diff_options()
 
         if any(x in self.args for x in ("--cached", "--staged")):
@@ -71,15 +71,17 @@ class Diff(PrintDiffMixin, Base):
             else:
                 self.print_workspace_diff(path)
 
-    def print_conflict_diff(self, path: str) -> None:
-        targets = [self.from_index(path, stage) for stage in range(4)]
+    def print_conflict_diff(self, path: str) -> None: 
+        targets = [self.from_index(Path(path), stage) for stage in range(4)]
         left, right = targets[2], targets[3]
 
-        if self.stage:
+        print(f"{targets=}")
+
+        if self.stage is not None:
             self.println(f"* Unmerged path {path}")
-            self.print_diff(targets[self.stage], self.from_file(path))
-        elif left and right:
-            self.print_combined_diff([left, right], self.from_file(path))
+            self.print_diff(targets[self.stage], self.from_file(Path(path)))
+        elif left is not None and right is not None:
+            self.print_combined_diff([left, right], self.from_file(Path(path)))
         else:
             self.println(f"* Unmerged path {path}")
 

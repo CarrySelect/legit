@@ -309,6 +309,22 @@ class TestUnconflictedMergeDeleteAddChild:
         assert_clean_merge(legit_cmd, load_commit)
 
 
+class TestUnconflictedMergeInFileMergePossible:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        merge3(
+            {"f.txt": "1\n2\n3\n"},
+            {"f.txt": "4\n2\n3\n"},
+            {"f.txt": "1\n2\n5\n"},
+        )
+
+    def test_it_puts_the_combined_changes_in_the_workspace(self, repo_path):
+        assert_workspace(repo_path, {"f.txt": "4\n2\n5\n"})
+
+    def test_it_creates_a_clean_merge(self, legit_cmd, load_commit):
+        assert_clean_merge(legit_cmd, load_commit)
+
+
 class TestConflictedMergeAddAdd:
     @pytest.fixture(autouse=True)
     def setup(self, merge3):
@@ -348,12 +364,25 @@ class TestConflictedMergeAddAdd:
         cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
         expected = "AA g.txt\n"
         assert_stdout(stdout, expected)
-
-    def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
+    
+    def test_shows_combined_diff_against_stages_2_and_3(self, legit_cmd):
         cmd, stdin, stdout, stderr = legit_cmd("diff")
-        expected = "* Unmerged path g.txt\n" 
-        assert_stdout(stdout, expected)
 
+        expected = (
+            "diff --cc g.txt\n"
+            "index 0cfbf08,00750ed..2603ab2\n"
+            "--- a/g.txt\n"
+            "+++ b/g.txt\n"
+            "@@@ -1,1 -1,1 +1,5 @@@\n"
+            "++<<<<<<< HEAD\n"
+            " +2\n"
+            "++=======\n"
+            "+ 3\n"
+            "++>>>>>>> topic\n"
+        )
+
+        assert_stdout(stdout, expected)
+   
     def test_it_shows_the_diff_against_our_version(self, legit_cmd):
         cmd, stdin, stdout, stderr = legit_cmd("diff", "--ours")
         expected = textwrap.dedent(
@@ -426,13 +455,36 @@ class TestConflictedMergeAddAddModeConflict:
     def test_it_does_not_write_a_merge_commit(self, legit_cmd, load_commit):
         assert_no_merge(legit_cmd, load_commit)
 
+    def test_shows_combined_diff_against_stages_2_and_3(self, legit_cmd):
+        cmd, stdin, stdout, stderr = legit_cmd("diff")
+    
+        expected = (
+            "diff --cc g.txt\n"
+            "index d8263ee,d8263ee..d8263ee\n"
+            "mode 100644,100755..100644\n"
+            "--- a/g.txt\n"
+            "+++ b/g.txt\n"
+        )
+    
+        assert_stdout(stdout, expected)
+
+
     def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
         cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
         assert_stdout(stdout, "AA g.txt\n")
 
-    def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
+    def test_shows_combined_diff_modes_against_stages_2_and_3(self, legit_cmd):
         cmd, stdin, stdout, stderr = legit_cmd("diff")
-        assert_stdout(stdout, "* Unmerged path g.txt\n")
+    
+        expected = (
+            "diff --cc g.txt\n"
+            "index d8263ee,d8263ee..d8263ee\n"
+            "mode 100644,100755..100644\n"
+            "--- a/g.txt\n"
+            "+++ b/g.txt\n"
+        )
+    
+        assert_stdout(stdout, expected)
 
     def test_it_reports_the_mode_change_in_the_appropriate_diff(self, legit_cmd):
         # When showing minimal diff (-2), only the unmerged marker appears
@@ -581,12 +633,26 @@ class TestConflictedMergeEditEdit:
     def test_it_reports_the_conflict_in_the_status(self, legit_cmd):
         cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
         assert_stdout(stdout, "UU f.txt\n")
-
-    def test_it_lists_the_file_as_unmerged_in_the_diff(self, legit_cmd):
+   
+    def test_shows_combined_diff_against_stages_2_and_3(self, legit_cmd):
         cmd, stdin, stdout, stderr = legit_cmd("diff")
-        assert_stdout(stdout, "* Unmerged path f.txt\n")
+    
+        expected = (
+            "diff --cc f.txt\n"
+            "index 0cfbf08,00750ed..2603ab2\n"
+            "--- a/f.txt\n"
+            "+++ b/f.txt\n"
+            "@@@ -1,1 -1,1 +1,5 @@@\n"
+            "++<<<<<<< HEAD\n"
+            " +2\n"
+            "++=======\n"
+            "+ 3\n"
+            "++>>>>>>> topic\n"
+        )
+    
+        assert_stdout(stdout, expected)
 
-
+  
 class TestConflictedMergeEditDelete:
     @pytest.fixture(autouse=True)
     def setup(self, merge3):

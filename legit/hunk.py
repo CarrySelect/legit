@@ -1,6 +1,5 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from itertools import zip_longest
 from typing import List, Optional
 from legit.myers import Edit, Line
 
@@ -27,10 +26,8 @@ class Hunk:
 
             offset -= HUNK_CONTEXT + 1
 
-            a_starts = [line.number for line in edits[offset].a_lines] if offset >= 0 else []
-            
-            b_line = edits[offset].b_line if offset >= 0 else None
-            b_start = b_line.number if b_line else None
+            a_starts = [] if offset < 0 else [line.number for line in edits[offset].a_lines]
+            b_start = None if offset < 0 else edits[offset].b_line.number
 
             hunk = Hunk(a_starts=a_starts, b_start=b_start, edits=[])
             hunks.append(hunk)
@@ -65,12 +62,16 @@ class Hunk:
 
     def header(self) -> str:
         list_of_a_lines = [e.a_lines for e in self.edits]
-        transposed_a_lines = list(zip_longest(*list_of_a_lines))
+        transposed_a_lines = list(zip(*list_of_a_lines))
 
-        offsets = [
-            self._format("-", lines, self.a_starts[i]) 
-            for i, lines in enumerate(transposed_a_lines)
-        ]
+        offsets = []
+        for i, lines in enumerate(transposed_a_lines):
+            try:
+                a_start = self.a_starts[i]
+            except IndexError:
+                a_start = None
+            fmt = self._format("-", lines, a_start)
+            offsets.append(fmt)
 
         b_lines = [e.b_line for e in self.edits]
         offsets.append(self._format("+", b_lines, self.b_start))
@@ -80,11 +81,12 @@ class Hunk:
         return " ".join([sep, *offsets, sep])
 
     def _format(self, sign: str, lines: List[Optional[Line]], start: Optional[int]) -> str:
-        compact_lines = [line for line in lines if line is not None]
+        lines = [ln for ln in lines if ln is not None]
 
-        line_start = compact_lines[0].number if compact_lines else start
-        final_start = line_start if line_start is not None else 0
-        
-        return f"{sign}{final_start},{len(compact_lines)}"
+        start_val = lines[0].number if lines else start
 
+        if start_val is None:
+            start_val = 1
+
+        return f"{sign}{start_val},{len(lines)}"
 

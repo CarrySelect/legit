@@ -6,8 +6,8 @@ from legit.diff import Edit
 
 SYMBOLS = {
     "del": "-",
-    "add": "+",
-    "eq": " ",
+    "ins": "+",
+    "eql": " ",
 }
 
 

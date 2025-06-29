@@ -20,6 +20,7 @@ class Log(PrintDiffMixin, Base):
         self.format = "medium"
         self.decorate = "auto"
         self.patch = False
+        self.combined = False
 
         if "--cc" in self.args:
             self.patch = self.combined = True
@@ -120,8 +121,8 @@ class Log(PrintDiffMixin, Base):
         self._blank_line()
 
         for path in paths:
-            parents = [self._from_diff_item(path, diff[path][0]) for diff in diffs]
-            child = self._from_diff_item(path, diffs[0][path][1])
+            parents = [self.from_diff_item(path, diff[path][0]) for diff in diffs]
+            child = self.from_diff_item(path, diffs[0][path][1])
 
             self.print_combined_diff(parents, child)
 

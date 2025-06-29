@@ -35,16 +35,15 @@ class PrintDiffMixin:
             a_modes = ",".join(str(a.mode) for a in a_versions)
             self._header(f"mode {a_modes}..{b_version.mode}")
     
-        self._header(f"--- a/{b_version.diff_path}")
-    
-        self._header(f"+++ b/{b_version.diff_path}")
+        self._header(f"--- a/{b_version.diff_path()}")
+        self._header(f"+++ b/{b_version.diff_path()}")
     
         a_data = [a.data for a in a_versions]
         b_data = b_version.data
         hunks = combined_hunks(a_data, b_data)
     
         for hunk in hunks:
-            self._print_diff_hunk(hunk)
+            self.print_diff_hunk(hunk)
 
 
     def print_diff(self, a: Target, b: Target) -> None:
