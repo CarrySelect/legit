@@ -936,7 +936,7 @@ class TestConflictResolution:
         cmd, _, _, _ = legit_cmd("merge", "--abort")
         assert cmd.status == 0
         _, _, stdout, _ = legit_cmd("status", "--porcelain")
-        assert stdout == ""
+        assert_stdout(stdout, "")
 
     def test_prevents_aborting_merge_when_none_in_progress(self, legit_cmd):
         legit_cmd("merge", "--abort")

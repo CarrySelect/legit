@@ -168,7 +168,7 @@ class Refs:
             return ref.oid if ref is not None else None
 
         try:
-            self.update_symref(self.path / ref.path, oid)
+            return self.update_symref(self.path / ref.path, oid)
         finally:
             lockfile.rollback()
 

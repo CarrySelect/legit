@@ -48,7 +48,7 @@ class Merge(WriteCommitMixin, Base):
     def handle_abort(self) -> None:
         try:
             self.repo.pending_commit().clear()
-        except Exception as e:
+        except PendingCommit.Error as e:
             self.stderr.write(f"fatal: {e}\n")
             self.exit(128)
         

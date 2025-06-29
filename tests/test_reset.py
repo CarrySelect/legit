@@ -1,6 +1,8 @@
 from pathlib import Path
 import pytest
 
+from tests.conftest import assert_stdout
+
 
 def _snapshot_workspace(repo_path: Path) -> dict[str, str]:
     result: dict[str, str] = {}
@@ -94,8 +96,8 @@ class TestResetWithHead:
         assert_workspace(repo_path, {
             "outer/b.txt": "4",
             "outer/d.txt": "5",
-            "outer/inner/c.txt": "6",
             "outer/e.txt": "7",
+            "outer/inner/c.txt": "6",
         })
 
     def assert_unchanged_head(self, repo):
@@ -186,7 +188,7 @@ class TestResetWithHead:
             "outer/inner/c.txt": "3",
         })
         cmd, _, stdout, _ = legit_cmd("status", "--porcelain")
-        assert stdout == "?? outer/e.txt\n"
+        assert_stdout(stdout, "?? outer/e.txt\n")
 
     def test_return_to_orig_head(self, legit_cmd, repo):
         legit_cmd("reset", "--hard", "@^")

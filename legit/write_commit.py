@@ -45,7 +45,7 @@ class WriteCommitMixin:
 
         message = "Committing is not possible because you have unmerged files"
         self.stderr.write(f"error: {message}." + '\n')
-        self.stderr.write(CONFLICT_MESSAGE + '\n')
+        self.stderr.write(CONFLICT_MESSAGE)
 
         self.exit(128)
 

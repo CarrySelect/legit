@@ -60,6 +60,9 @@ class HardReset:
         self.repo.index.add(path, entry.oid, stat)
 
 class PendingCommit:
+    class Error(Exception):
+        pass
+
     def __init__(self, path: Path) -> None:
         self.head_path = path / "MERGE_HEAD"
         self.message_path = path / "MERGE_MSG"
@@ -70,7 +73,7 @@ class PendingCommit:
             return self.head_path.read_text().strip()
         except FileNotFoundError:
             name = self.head_path.name
-            raise Exception(f"There is no merge in progress ({name} missing).")
+            raise PendingCommit.Error(f"There is no merge in progress ({name} missing).")
 
     @property
     def merge_message(self):
@@ -89,7 +92,7 @@ class PendingCommit:
             self.message_path.unlink()
         except FileNotFoundError:
             name = self.head_path.name
-            raise Exception(f"There is no merge to abort ({name} missing).")
+            raise PendingCommit.Error(f"There is no merge to abort ({name} missing).")
 
     def is_in_progress(self) -> bool:
         return self.head_path.exists()

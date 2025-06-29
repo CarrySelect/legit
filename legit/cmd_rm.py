@@ -23,19 +23,24 @@ class Rm(Base):
 
         self.head_oid = self.repo.refs.read_head()
         self.inspector = Inspector(self.repo)
-        self.uncommited = []
+        self.uncommitted = []
         self.unstaged = []
         self.both_changed = []
 
-        expanded = itertools.chain.from_iterable(
-            self.expand_path(Path(p)) for p in self.args
-        )
-        self.args = [p for p in expanded]
+        try:
+            expanded = itertools.chain.from_iterable(
+                self.expand_path(Path(p)) for p in self.args
+            )
+            self.args = [str(p) for p in expanded]
+        except ValueError as e:
+            self.repo.index.release_lock()
+            self.stderr.write(f"fatal: {e}\n")
+            self.exit(128)
         
         try:
             for path in self.args:
                 self.plan_removal(path)
-        except Exception as e:
+        except ValueError as e:
             self.repo.index.release_lock()
             self.stderr.write(f"fatal: {e}\n")
             self.exit(128)
@@ -83,8 +88,8 @@ class Rm(Base):
             return
 
         stat_result = self.repo.workspace.stat_file(Path(path))
-        if stat.S_ISDIR(stat_result.st_mode):
-            raise Exception(f"legit rm: '{path}': Operation not permitted")
+        if stat_result is not None and stat.S_ISDIR(stat_result.st_mode):
+            raise ValueError(f"legit rm: '{path}': Operation not permitted")
 
         item = self.repo.database.load_tree_entry(self.head_oid, Path(path))
         entry = self.repo.index.entry_for_path(Path(path))
@@ -99,17 +104,17 @@ class Rm(Base):
             self.both_changed.append(Path(path))
         elif staged_change is not None:
             if not self.cached:
-                self.uncommited.append(Path(path))
+                self.uncommitted.append(Path(path))
         elif unstaged_change is not None:
             if not self.cached:
                 self.unstaged.append(Path(path))
 
     def exit_on_errors(self) -> None:
-        if all(not x for x in (self.unstaged, self.uncommited, self.both_changed)):
+        if all(not x for x in (self.unstaged, self.uncommitted, self.both_changed)):
             return
 
         self.print_errors(self.both_changed, BOTH_CHANGED)
-        self.print_errors(self.uncommited, INDEX_CHANGED)
+        self.print_errors(self.uncommitted, INDEX_CHANGED)
         self.print_errors(self.unstaged, WORKSPACE_CHANGED)
 
         self.repo.index.release_lock()
