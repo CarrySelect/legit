@@ -18,14 +18,19 @@ class Merge(WriteCommitMixin, Base):
 
         if "--continue" in self.args:
             self.mode = "continue"
+        elif "--abort" in self.args:
+            self.mode = "abort"
          
         if self.mode == "--continue":
             self.handle_continue()
+        elif self.mode == "--abort":
+            self.handle_abort()
  
         if self.pending_commit.is_in_progress():
             self.handle_in_progress_merge()
 
         self.inputs = Inputs(self.repo, "HEAD", self.args[0])
+        self.repo.refs.update_ref("ORIG_HEAD", self.inputs.left_oid)
 
         if self.inputs.are_already_merged():
             self.handle_merged_ancestor()
@@ -38,6 +43,19 @@ class Merge(WriteCommitMixin, Base):
         self.resolve_merge()
         self.commit_merge()
         
+        self.exit(0)
+
+    def handle_abort(self) -> None:
+        try:
+            self.repo.pending_commit().clear()
+        except Exception as e:
+            self.stderr.write(f"fatal: {e}\n")
+            self.exit(128)
+        
+        self.repo.index.load_for_update()
+        self.repo.hard_reset(self.repo.refs.read_head())
+        self.repo.index.write_updates()
+
         self.exit(0)
 
     def handle_continue(self) -> None:

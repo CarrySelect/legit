@@ -58,6 +58,7 @@ class HardReset:
 
         stat = self.repo.workspace.stat_file(path)
         self.repo.index.add(path, entry.oid, stat)
+
 class PendingCommit:
     def __init__(self, path: Path) -> None:
         self.head_path = path / "MERGE_HEAD"
@@ -83,8 +84,12 @@ class PendingCommit:
             f.write(msg)
 
     def clear(self) -> None:
-        self.head_path.unlink()
-        self.message_path.unlink()
+        try:
+            self.head_path.unlink()
+            self.message_path.unlink()
+        except FileNotFoundError:
+            name = self.head_path.name
+            raise Exception(f"There is no merge to abort ({name} missing).")
 
     def is_in_progress(self) -> bool:
         return self.head_path.exists()
