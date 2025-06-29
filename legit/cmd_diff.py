@@ -75,8 +75,6 @@ class Diff(PrintDiffMixin, Base):
         targets = [self.from_index(Path(path), stage) for stage in range(4)]
         left, right = targets[2], targets[3]
 
-        print(f"{targets=}")
-
         if self.stage is not None:
             self.println(f"* Unmerged path {path}")
             self.print_diff(targets[self.stage], self.from_file(Path(path)))

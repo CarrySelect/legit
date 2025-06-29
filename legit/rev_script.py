@@ -1,5 +1,5 @@
 from legit.revision import Revision
 
-revstr = "@^"
+revstr = "master~5"
 
 print(Revision.parse(revstr))

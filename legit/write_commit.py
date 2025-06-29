@@ -34,9 +34,9 @@ class WriteCommitMixin:
 
     def resume_merge(self):
         self.handle_conflicted_index()
-        parents = [self.repo.refs.read_head(), self.pending_commit.merge_oid]
-        self.write_commit(parents, self.pending_commit.merge_message)
-        self.pending_commit.clear()
+        parents = [self.repo.refs.read_head(), self.repo.pending_commit().merge_oid]
+        self.write_commit(parents, self.repo.pending_commit().merge_message)
+        self.repo.pending_commit().clear()
         self.exit(0)
 
     def handle_conflicted_index(self) -> None:

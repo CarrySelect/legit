@@ -163,46 +163,44 @@ def checkout(target: str) -> None:
 def log(abbrev: bool | None, format_: str, oneline: bool, decoration: str, patch: bool, revisions_and_paths: tuple[str, ...]):
     """Display commit history."""
     
-    # Process the --oneline shortcut, which overrides other format options
-    # and implies abbreviation unless explicitly disabled.
     if oneline:
         format_ = "oneline"
-        if abbrev is None:  # Only default to abbrev if it wasn't set explicitly
+        if abbrev is None:
             abbrev = True
 
-    # Prepare the list of arguments for the backend command
     cmd_args = ["log"]
 
-    # Add flags based on the final processed options
     if abbrev is True:
         cmd_args.append("--abbrev-commit")
     elif abbrev is False:
         cmd_args.append("--no-abbrev-commit")
 
-    # Add pretty format if it's not the default
     if format_ != "medium":
-        # The --oneline flag is the canonical way to get that format
         if format_ == "oneline":
              cmd_args.append("--oneline")
         else:
              cmd_args.append(f"--pretty={format_}")
     
-    # Add decoration flag unless it's the default 'auto'
     if decoration != "auto":
         if decoration == "no":
             cmd_args.append("--no-decorate")
         else:
-            # For 'short' or 'full'. This matches git's --decorate=<format>
             cmd_args.append(f"--decorate={decoration}")
 
     if patch:
         cmd_args.append("--patch")
     
-    # Add any remaining arguments (revisions, paths)
     if revisions_and_paths:
         cmd_args.extend(revisions_and_paths)
 
-    # Execute the command with the constructed arguments
+    run_cmd(*cmd_args)
+
+@cli.command()
+@click.argument("refs", nargs=-1)
+def merge(refs: tuple[str, ...]) -> None:
+    """Join two or more development histories together."""
+    cmd_args = ["merge"]
+    cmd_args.extend(refs)
     run_cmd(*cmd_args)
 
 

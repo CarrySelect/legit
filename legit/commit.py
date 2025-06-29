@@ -24,7 +24,10 @@ class Commit:
     
     @parent.setter
     def parent(self, value):
-        self.parents[0] = value
+        if not self.parents:
+            self.parents.append(value)
+        else:
+            self.parents[0] = value   
 
     @classmethod
     def parse(cls, data: bytes) -> "Commit":

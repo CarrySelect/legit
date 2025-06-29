@@ -113,36 +113,24 @@ class Revision:
         return not bool(cls.INVALID_NAME.search(revision))
 
     @classmethod
-    def parse(cls, revision: str) -> Optional[Union[Ref, Parent, Ancestor]]:
-        """
-        Parse a revision string into one of the nested types:
-          - Parent if it ends with '^'
-          - Ancestor if it ends with '~<n>'
-          - Ref otherwise (if valid)
-        Returns None if it doesn’t match any valid pattern.
-        """
-        # Parent syntax (e.g. "main^")
-        m = cls.PARENT_PATTERN.match(revision)
-        if m:
+    def parse(cls, revision: str) -> Optional[Union['Ref', 'Parent', 'Ancestor']]:
+        if m := cls.PARENT_PATTERN.match(revision):
             rev = Revision.parse(m.group(1))
             n = 1 if not m.group(2) else int(m.group(2))
             return cls.Parent(rev, n) if rev else None
 
-        # Ancestor syntax (e.g. "main~3")
-        m = cls.ANCESTOR_PATTERN.match(revision)
-        if m:
+        elif m := cls.ANCESTOR_PATTERN.match(revision):
             base, num = m.group(1), int(m.group(2))
             rev = cls.parse(base)
             return cls.Ancestor(rev, num) if rev else None
 
-        # Plain ref (e.g. "main" or "@")
-        if cls.valid_ref(revision):
+        elif cls.valid_ref(revision):
             name = cls.REF_ALIASES.get(revision, revision)
             return cls.Ref(name)
 
-        # Invalid
-        return None
-    
+        else:
+            return None
+   
     def commit_parent(self, oid: str | None, n: int = 1) -> Optional[str]:
         if oid is None:
             return None

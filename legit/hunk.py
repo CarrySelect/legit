@@ -86,7 +86,7 @@ class Hunk:
         start_val = lines[0].number if lines else start
 
         if start_val is None:
-            start_val = 1
+            start_val = 0
 
         return f"{sign}{start_val},{len(lines)}"
 
