@@ -155,14 +155,17 @@ class Refs:
     def update_head(self, oid: str) -> None:
         self.update_symref(self.path / Refs.HEAD, oid)
 
-    def update_symref(self, path: Path, oid: str) -> None:
+    def update_ref(self, name: str, oid: str) -> None:
+        self._update_ref_file(self.path / name, oid)
+
+    def update_symref(self, path: Path, oid: str) -> Optional[str]:
         lockfile = Lockfile(path)
         lockfile.hold_for_update()
 
         ref = self.read_oid_or_symref(path)
         if not isinstance(ref, Refs.SymRef):
             self.write_lockfile(lockfile, oid)
-            return
+            return ref.oid if ref is not None else None
 
         try:
             self.update_symref(self.path / ref.path, oid)

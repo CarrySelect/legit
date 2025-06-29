@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import (
     MutableMapping,
     TYPE_CHECKING,
+    Optional,
 )
 
 if TYPE_CHECKING:
@@ -21,7 +22,7 @@ from legit.inspector import Inspector
 
 
 class Status:
-    def __init__(self, repo: Repository) -> None:
+    def __init__(self, repo: Repository, commit_oid: Optional[str] = None) -> None:
         self.inspector: Inspector = Inspector(repo)
         self.repo = repo
         self.stats: MutableMapping[Path, os.stat_result] = {}
@@ -30,11 +31,16 @@ class Status:
         self.changed: set[str] = set()
         self.untracked: set[str] = set()
         self.conflicts = defaultdict(list)
-        self.head_tree = self.repo.database.load_tree_list(self.repo.refs.read_head())
+
+        if commit_oid is None:
+            commit_oid = self.repo.refs.read_head()
+
+        self.head_tree = self.repo.database.load_tree_list(commit_oid)
 
         self.scan_workspace()
         self.check_index_entries()
         self.collect_deleted_head_files()
+
 
     def collect_deleted_head_files(self) -> None:
         for path in self.head_tree.keys():

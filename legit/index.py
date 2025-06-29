@@ -153,7 +153,7 @@ class Index:
         self.load()
 
     def load(self) -> None:
-        self.clear()
+        self._clear()
 
         file = self.open_index_file()
 
@@ -164,8 +164,12 @@ class Index:
             reader.verify_checksum()
 
             file.close()
-
+    
     def clear(self) -> None:
+        self._clear()
+        self.changed = True
+
+    def _clear(self) -> None:
         self.entries = {}
         self.changed = False
         self.parents = defaultdict(set)

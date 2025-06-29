@@ -7,17 +7,44 @@ from legit.revision import Revision
 
 class Reset(Base):
     def run(self) -> None:
+        self.define_options()
+
         self.repo: Repository = Repository(self.dir / ".git")
+
         self.select_commit_oid()
 
         self.repo.index.load_for_update()
-
-        for path in self.args:
-            self.reset_path(Path(path))
-
+        self.reset_files()
         self.repo.index.write_updates()
 
+        if not self.args:
+            head_oid = self.repo.refs.update_head(self.commit_oid)
+            self.repo.refs.update_ref("ORIG_HEAD", head_oid)
+
         self.exit(0)
+
+    def reset_files(self) -> None:
+        if self.mode == "soft":
+            return
+
+        if self.mode == "hard":
+            return self.repo.hard_reset(self.commit_oid)
+
+        if not self.args:
+            self.repo.index.clear()
+            self.reset_path(None)
+        else:
+            for path in self.args:
+                self.reset_path(Path(path))
+
+    def define_options(self) -> None:
+        self.mode = "mixed"
+        if "--soft" in self.args:
+            self.mode = "soft"
+        elif "--mixed" in self.args:
+            self.mode = "mixed"
+        elif "--hard" in self.args:
+            self.mode = "hard"
 
     def select_commit_oid(self) -> None:
         revision = self.args[0] if self.args[0] is not None else "HEAD"

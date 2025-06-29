@@ -21,16 +21,17 @@ class Workspace:
     def __init__(self, path: Path) -> None:
         self.path: Path = path
     
-    def remove(self, path: Path) -> None:
-        try:
-            path.unlink()
-        except FileNotFoundError:
-            pass
-    
-    def write_file(self, path: Path, data: str) -> None:
-        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-        with os.fdopen(os.open(self.path / path, flags, 0o644), "w") as f:
+    def write_file(self, path: Path, data: str, mode: Optional[int] = None, mkdir: bool = False) -> None:
+        full_path: Path = self.path / path
+        if mkdir:
+            full_path.parent.mkdir(exist_ok=True, parents=True)
+
+        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+        with os.fdopen(os.open(full_path, flags), "w") as f:
             f.write(data)
+
+        if mode:
+            full_path.chmod(mode)
 
     def apply_migration(self, migration: 'Migration') -> None:
         self.apply_change_list(migration, "delete")
@@ -46,18 +47,9 @@ class Workspace:
    
     def remove(self, path: str):
         try:
-            relative_path = Path(path)
-
-            full_path_to_file = self.path / relative_path
-            full_path_to_file.unlink()
-
-            for parent_dir_part in relative_path.parents:
-                if str(parent_dir_part) == '.':
-                    continue
-                
-                full_path_to_dir = self.path / parent_dir_part
-                self.remove_directory(full_path_to_dir)
-
+            self._rm_rf(self.path / path)
+            for parent in Path(path).parents:
+                self.remove_directory(parent)
         except FileNotFoundError:
             pass
 

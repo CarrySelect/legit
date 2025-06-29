@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Optional
 
 from legit.blob import Blob
 from legit.tree import DatabaseEntry
@@ -19,8 +20,8 @@ class Repository:
         self.refs: Refs = Refs(git_path)
         self.workspace: Workspace = Workspace(git_path.parent)
 
-    def status(self) -> Status:
-        return Status(self)
+    def status(self, commit_oid: Optional[str] = None) -> Status:
+        return Status(self, commit_oid)
 
     def migration(self, tree_diff: dict[Path, list[DatabaseEntry]]) -> 'Migration':
         return Migration(self, tree_diff)
@@ -28,7 +29,35 @@ class Repository:
     def pending_commit(self) -> 'PendingCommit':
         return PendingCommit(self.git_path)
 
+    def hard_reset(self, oid: str) -> None:
+        HardReset(self, oid).execute()
 
+
+class HardReset:
+    def __init__(self, repo: Repository, oid: str) -> None:
+        self.repo = repo
+        self.oid = oid
+
+    def execute(self) -> None:
+        self.status = self.repo.status(self.oid)
+        changed = [Path(path) for path in self.status.changed]
+
+        for path in changed:
+            self.reset_path(path)
+
+    def reset_path(self, path: Path) -> None:
+        self.repo.index.remove(path)
+        self.repo.workspace.remove(path)
+
+        entry = self.status.head_tree[path]
+        if entry is None:
+            return
+
+        blob = self.repo.database.load(entry.oid)
+        self.repo.workspace.write_file(path, blob.data, entry.mode, True)
+
+        stat = self.repo.workspace.stat_file(path)
+        self.repo.index.add(path, entry.oid, stat)
 class PendingCommit:
     def __init__(self, path: Path) -> None:
         self.head_path = path / "MERGE_HEAD"
