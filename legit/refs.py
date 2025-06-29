@@ -152,8 +152,8 @@ class Refs:
         head = self.read_symref(self.path / Refs.HEAD)
         return head
 
-    def update_head(self, oid: str) -> None:
-        self.update_symref(self.path / Refs.HEAD, oid)
+    def update_head(self, oid: str) -> Optional[str]:
+        return self.update_symref(self.path / Refs.HEAD, oid)
 
     def update_ref(self, name: str, oid: str) -> None:
         self._update_ref_file(self.path / name, oid)

@@ -16,6 +16,7 @@ from legit.cmd_checkout import Checkout
 from legit.cmd_log import Log
 from legit.cmd_merge import Merge
 from legit.cmd_rm import Rm
+from legit.cmd_reset import Reset
 
 
 class Command:
@@ -33,6 +34,7 @@ class Command:
         "log": Log,
         "merge": Merge,
         "rm": Rm,
+        "reset": Reset,
     }
 
     @staticmethod

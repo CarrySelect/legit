@@ -21,9 +21,9 @@ class Merge(WriteCommitMixin, Base):
         elif "--abort" in self.args:
             self.mode = "abort"
          
-        if self.mode == "--continue":
+        if self.mode == "continue":
             self.handle_continue()
-        elif self.mode == "--abort":
+        elif self.mode == "abort":
             self.handle_abort()
  
         if self.pending_commit.is_in_progress():
@@ -63,12 +63,12 @@ class Merge(WriteCommitMixin, Base):
         try:
             self.resume_merge()
         except PendingCommit.Error as e:
-            self.stderr.write(f"fatal: {e}")
+            self.stderr.write(f"fatal: {e}\n")
             self.exit(128)
 
     def handle_in_progress_merge(self) -> None:
-        message = "Merging is not possible because you have unmerged files"
-        self.stderr.write(f"error: {message}")
+        message = "Merging is not possible because you have unmerged files."
+        self.stderr.write(f"error: {message}\n")
         self.stderr.write(CONFLICT_MESSAGE)
         self.exit(128)
 

@@ -6,7 +6,7 @@ from legit.tree import Tree
 
 
 CONFLICT_MESSAGE: str = textwrap.dedent("""\
-    hint: Fix them up in the work tree, then use 'legit add <file>'
+    hint: Fix them up in the work tree, and then use 'legit add/rm <file>'
     hint: as appropriate to mark resolution and make a commit.
     fatal: Exiting because of an unresolved conflict.
 """)

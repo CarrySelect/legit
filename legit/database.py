@@ -52,7 +52,7 @@ class Database:
             entry = self.load(entry.oid).entries[name]
         return entry
 
-    def load_tree_list(self, oid: Optional[str], path: Optional[Path]):
+    def load_tree_list(self, oid: Optional[str], path: Optional[Path] = None):
         if oid is None:
             return {}
 
@@ -66,7 +66,7 @@ class Database:
             return
 
         if not entry.is_tree():
-            thing[str(prefix)] = entry
+            thing[prefix] = entry
             return entry
         
         for name, item in self.load(entry.oid).entries.items():

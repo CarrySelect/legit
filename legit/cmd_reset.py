@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Optional
 from legit.cmd_base import Base
+from legit.index import Index
 from legit.repository import Repository
 from legit.revision import Revision
 
@@ -47,12 +48,18 @@ class Reset(Base):
             self.mode = "hard"
 
     def select_commit_oid(self) -> None:
-        revision = self.args[0] if self.args[0] is not None else "HEAD"
+        try:
+            revision = self.args[0]
+        except IndexError:
+            revision = "HEAD"
         try:
             self.commit_oid = Revision(self.repo, revision).resolve()
         except Revision.InvalidObject:
             self.commit_oid = self.repo.refs.read_head()
-        self.args.pop(0)
+        try:
+            self.args.pop(0)
+        except IndexError:
+            pass
 
     def reset_path(self, path: Optional[Path]) -> None:
         listing = self.repo.database.load_tree_list(self.commit_oid, path)

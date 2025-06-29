@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.conftest import assert_stdout
+from tests.conftest import assert_stdout, assert_stderr
 
 
 class FileMode(enum.Enum):
@@ -872,4 +872,86 @@ class TestMultipleCommonAncestors:
 
         cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
         assert_stdout(stdout, "")
+
+class TestConflictResolution:
+    @pytest.fixture(autouse=True)
+    def setup(self, merge3):
+        # Create a three-way conflict on f.txt
+        merge3(
+            {"f.txt": "1\n"},
+            {"f.txt": "2\n"},
+            {"f.txt": "3\n"}
+        )
+
+    def test_prevents_commits_with_unmerged_entries(self, legit_cmd, load_commit):
+        cmd, _, _, stderr = legit_cmd("commit")
+        assert cmd.status == 128
+        expected = (
+            "error: Committing is not possible because you have unmerged files.\n"
+            "hint: Fix them up in the work tree, and then use 'legit add/rm <file>'\n"
+            "hint: as appropriate to mark resolution and make a commit.\n"
+            "fatal: Exiting because of an unresolved conflict.\n"
+        )
+        assert_stderr(stderr, expected)
+        assert load_commit("@").message == "B"
+
+    def test_prevents_merge_continue_with_unmerged_entries(self, legit_cmd, load_commit):
+        cmd, _, _, stderr = legit_cmd("merge", "--continue")
+        assert cmd.status == 128
+        expected = (
+            "error: Committing is not possible because you have unmerged files.\n"
+            "hint: Fix them up in the work tree, and then use 'legit add/rm <file>'\n"
+            "hint: as appropriate to mark resolution and make a commit.\n"
+            "fatal: Exiting because of an unresolved conflict.\n"
+        )
+        assert_stderr(stderr, expected)
+        assert load_commit("@").message == "B"
+
+    def test_commits_a_merge_after_resolving_conflicts(self, legit_cmd, load_commit):
+        legit_cmd("add", "f.txt")
+        cmd, _, _, _ = legit_cmd("commit")
+        assert cmd.status == 0
+        commit = load_commit("@")
+        assert commit.message == "M"
+        parents = [load_commit(oid).message for oid in commit.parents]
+        assert parents == ["B", "C"]
+
+    def test_allows_merge_continue_after_resolving_conflicts(self, legit_cmd, load_commit):
+        legit_cmd("add", "f.txt")
+        cmd, _, _, _ = legit_cmd("merge", "--continue")
+        assert cmd.status == 0
+        commit = load_commit("@")
+        assert commit.message == "M"
+        parents = [load_commit(oid).message for oid in commit.parents]
+        assert parents == ["B", "C"]
+
+    def test_prevents_merge_continue_when_none_in_progress(self, legit_cmd):
+        legit_cmd("add", "f.txt")
+        legit_cmd("merge", "--continue")
+        cmd, _, _, stderr = legit_cmd("merge", "--continue")
+        assert cmd.status == 128
+        assert_stderr(stderr, "fatal: There is no merge in progress (MERGE_HEAD missing).\n")
+
+    def test_aborts_the_merge(self, legit_cmd):
+        cmd, _, _, _ = legit_cmd("merge", "--abort")
+        assert cmd.status == 0
+        _, _, stdout, _ = legit_cmd("status", "--porcelain")
+        assert stdout == ""
+
+    def test_prevents_aborting_merge_when_none_in_progress(self, legit_cmd):
+        legit_cmd("merge", "--abort")
+        cmd, _, _, stderr = legit_cmd("merge", "--abort")
+        assert cmd.status == 128
+        assert_stderr(stderr, "fatal: There is no merge to abort (MERGE_HEAD missing).\n")
+
+    def test_prevents_starting_new_merge_while_one_in_progress(self, legit_cmd):
+        cmd, _, _, stderr = legit_cmd("merge")
+        assert cmd.status == 128
+        expected = (
+            "error: Merging is not possible because you have unmerged files.\n"
+            "hint: Fix them up in the work tree, and then use 'legit add/rm <file>'\n"
+            "hint: as appropriate to mark resolution and make a commit.\n"
+            "fatal: Exiting because of an unresolved conflict.\n"
+        )
+        assert_stderr(stderr, expected)
 

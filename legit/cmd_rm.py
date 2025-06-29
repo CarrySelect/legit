@@ -50,20 +50,14 @@ class Rm(Base):
         self.exit(0)
 
     def define_options(self) -> None:
-        if "--cached" in self.args:
-            self.cached = True
-        else:
-            self.cached = False
-
-        if "-f" in self.args or "--force" in self.args:
-            self.force = True
-        else:
-            self.force = False
-
-        if "-r" in self.args:
-            self.recursive = True
-        else:
-            self.recursive = False
+       self.cached = "--cached" in self.args
+       self.force = "-f" in self.args or "--force" in self.args
+       self.recursive = "-r" in self.args
+   
+       self.args = [
+           arg for arg in self.args
+           if arg not in ("--cached", "-f", "--force", "-r")
+       ]
 
     def expand_path(self, path):
         if self.repo.index.is_tracked_directory(path):
@@ -128,7 +122,7 @@ class Rm(Base):
 
         files_have = "file has" if len(paths) == 1 else "files have"
 
-        self.stderr.write(f"error: the following {files_have} {message}\n")
+        self.stderr.write(f"error: the following {files_have} {message}:\n")
 
         for path in paths:
             self.stderr.write(f"    {path}\n")

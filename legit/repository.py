@@ -49,7 +49,7 @@ class HardReset:
         self.repo.index.remove(path)
         self.repo.workspace.remove(path)
 
-        entry = self.status.head_tree[path]
+        entry = self.status.head_tree.get(path)
         if entry is None:
             return
 
