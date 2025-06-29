@@ -557,8 +557,9 @@ def test_shows_combined_patches_for_merges(legit_cmd, repo, graph_of_commits_set
         --- a/h.txt
         +++ b/h.txt
         @@@ -1,3 -1,3 +1,3 @@@
-         one
-         two
+         -one
+         +D
+          two
         - three
         + G
         {m[2]} D

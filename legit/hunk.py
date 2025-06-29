@@ -45,19 +45,17 @@ class Hunk:
             offset += 1
             if offset >= len(edits):
                 break
+           
+            try:
+                spam = edits[offset + HUNK_CONTEXT]
+            except IndexError:
+                spam = None
 
-            lookahead_index = offset + HUNK_CONTEXT
-            edit_type_ahead = None
-            if lookahead_index < len(edits):
-                lookahead_edit = edits[lookahead_index]
-                if lookahead_edit:
-                    edit_type_ahead = lookahead_edit.ty
-            
-            if edit_type_ahead in ('ins', 'del'):
+            if spam is not None and (spam.ty == "ins" or spam.ty == "del"):
                 counter = 2 * HUNK_CONTEXT + 1
             else:
                 counter -= 1
-        
+
         return offset
 
     def header(self) -> str:
