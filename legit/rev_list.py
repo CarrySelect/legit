@@ -13,7 +13,7 @@ class RevList:
     RANGE = re.compile(r"^(.*)\.\.(.*)$")
     EXCLUDE = re.compile(r"^\^(.+)$")
 
-    def __init__(self, repo: Repository, revs: list[str]) -> None:
+    def __init__(self, repo: Repository, revs: list[str], options={}) -> None:
         self.repo: Repository = repo
         self.commits: dict[str, Any] = {}
         self.flags = defaultdict(set)
@@ -22,6 +22,7 @@ class RevList:
         self.queue = []
         self.prune = []
         self.diffs = {}
+        self.walk = options.get("walk", True)
 
         for rev in revs:
             self.handle_revision(rev)
@@ -62,8 +63,10 @@ class RevList:
         elif m := RevList.RANGE.match(rev):
             self.set_start_point(m.group(1), False)
             self.set_start_point(m.group(2), True)
+            self.walk = True
         elif m := RevList.EXCLUDE.match(rev):
             self.set_start_point(m.group(1), False)
+            self.walk = True
         else:
             self.set_start_point(rev, True)
 
@@ -98,13 +101,16 @@ class RevList:
         if not self.mark(commit.oid, "seen"):
             return
 
-        index = next(
-            (i for i, c in enumerate(self.queue) if c.date() < commit.date()),
-            None
-        )
+        if self.walk:
+            index = next(
+                (i for i, c in enumerate(self.queue) if c.date() < commit.date()),
+                None
+            )
 
-        pos = index if index is not None else len(self.queue)
-        self.queue.insert(pos, commit)
+            pos = index if index is not None else len(self.queue)
+            self.queue.insert(pos, commit)
+        else:
+            self.queue.append(commit)
 
     def each(self) -> Generator[Commit]:
         if self.limited:
@@ -161,7 +167,7 @@ class RevList:
             yield commit
             
     def add_parents(self, commit):
-        if not self.mark(commit.oid, "added"):
+        if not (self.walk and self.mark(commit.oid, "added")):
             return
 
         if self.is_marked(commit.oid, "uninteresting"):

@@ -1,8 +1,10 @@
+import re
 import os
 from pathlib import Path
 from typing import Optional
 
 from legit.blob import Blob
+from legit.commit import Commit
 from legit.tree import DatabaseEntry
 from legit.database import Database
 from legit.index import Index
@@ -10,6 +12,10 @@ from legit.refs import Refs
 from legit.workspace import Workspace
 from legit.status import Status
 from legit.migration import Migration
+from legit.lockfile import Lockfile
+
+
+UNSAFE_MESSAGE = "You seem to have moved HEAD. Not rewinding, check your HEAD!"
 
 
 class Repository:
@@ -108,3 +114,88 @@ class PendingCommit:
             if path.exists():
                 return ty
         return None
+
+
+class Sequencer:
+    def __init__(self, repo: Repository) -> None:
+        self.repo: Repository = repo
+        self.path = self.repo.git_path / "sequencer"
+        self.todo_path = self.path / "todo"
+        self.todo_file = None
+        self.abort_path = self.path / "aborty-safety"
+        self.head_path = self.path / "head"
+        self.commands = []
+
+    def start(self) -> None:
+        self.path.mkdir(parents=True, exist_ok=False)
+
+        head_oid = self.repo.refs.read_head()
+        self.write_file(self.head_path, head_oid)
+        self.write_file(self.abort_path, head_oid)
+
+        self.open_todo_file()
+
+    def write_file(self, path: Path, data: str) -> None:
+        lockfile = Lockfile(path)
+        lockfile.hold_for_update()
+        lockfile.write(data.encode('utf-8') + b'\n')
+        lockfile.commit()
+
+    def pick(self, commit: Commit) -> None:
+        self.commands.append(commit)
+
+    def next_command(self):
+        try:
+            return self.commands[0]
+        except IndexError:
+            return None
+
+    def drop_command(self) -> None:
+        self.commands.pop(0)
+        self.write_file(self.abort_path, self.repo.refs.read_head())
+    
+    def open_todo_file(self) -> None:
+        if not self.path.is_dir():
+            return
+
+        self.todo_file = Lockfile(self.todo_path)
+        self.todo_file.hold_for_update()
+
+    def dump(self) -> None:
+        if self.todo_file is None:
+            return
+
+        for commit in self.commands:
+            short = self.repo.database.short_oid(commit.oid)
+            self.todo_file.write(f"pick {short} {commit.title_line()}\n".encode('utf-8'))
+        
+        self.todo_file.commit()
+
+    def load(self) -> None:
+        self.open_todo_file()
+        if not self.todo_path.exists():
+            return
+    
+        for line in self.todo_path.read_text().splitlines():
+            oid, _rest = re.compile(r"^pick (\S+) (.*)$").match(line).groups()
+            oids = self.repo.database.prefix_match(oid)
+            self.commands.append(self.repo.database.load(oids[0]))
+
+    def quit(self) -> None:
+        import shutil
+        shutil.rmtree(self.path)
+
+    def abort(self) -> None:
+        head_oid = self.head_path.read_text().strip()
+        expected = self.abort_path.read_text().strip()
+        actual = self.repo.refs.read_head().strip()
+
+        self.quit()
+
+        if actual != expected:
+            raise ValueError(UNSAFE_MESSAGE)
+        
+        self.repo.hard_reset(head_oid)
+        orig_head = self.repo.refs.update_head(head_oid)
+        self.repo.refs.update_ref("ORIG_HEAD", orig_head)
+

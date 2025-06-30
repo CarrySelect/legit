@@ -3,10 +3,11 @@ from legit.cmd_base import Base
 from legit.commit import Commit
 from legit.write_commit import WriteCommitMixin
 from legit.revision import Revision
-from legit.repository import Repository, PendingCommit
+from legit.repository import Repository, PendingCommit, Sequencer
 from legit.inputs import CherryPick as CherryPickInput
 from legit.resolve import Resolve
 from legit.editor import Editor
+from legit.rev_list import RevList
 
 
 CONFLICT_NOTES = textwrap.dedent(
@@ -21,30 +22,76 @@ CONFLICT_NOTES = textwrap.dedent(
 class CherryPick(WriteCommitMixin, Base):
     def run(self) -> None:
         self.repo: Repository = Repository(self.dir / ".git")
-        
+        self.sequencer: Sequencer = Sequencer(self.repo)
+
         if self.mode == "continue":
             self.handle_continue()
+        elif self.mode == "abort":
+            self.handle_abort()
+        elif self.mode == "quit":
+            self.handle_quit()
 
-        revision = Revision(self.repo, self.args[0])
-        commit = self.repo.database.load(revision.resolve())
-        
-        self.pick(commit)
+        self.sequencer.start()
+        self.store_commit_sequence()
+        self.resume_sequencer()
 
+    def handle_abort(self) -> None:
+        if self.repo.pending_commit().is_in_progress():
+            self.repo.pending_commit().clear(self.merge_type())
+        self.repo.index.load_for_update()
+
+        try:
+            self.sequencer.abort()
+        except Exception as e:
+            self.stderr.write(f"warning: {e}\n")
+
+        self.repo.index.write_updates()
         self.exit(0)
 
+
+    def handle_quit(self) -> None:
+        if self.repo.pending_commit().is_in_progress():
+            self.repo.pending_commit().clear(self.merge_type())
+        self.sequencer.quit()
+        self.exit(0)
+
+    def store_commit_sequence(self) -> None:
+        commits = RevList(self.repo, self.args.reverse(), {"walk": False})
+        for commit in reversed(list(commits.each())):
+            self.sequencer.pick(commit)
+
+    def resume_sequencer(self) -> None:
+        while True:
+            commit = self.sequencer.next_command()
+            if commit is None:
+                break
+            self.pick(commit)
+            self.sequencer.drop_command()
+
+        self.sequencer.quit()
+        self.exit(0)
+    
     def define_options(self) -> None:
         self.mode = "run"
         if "--continue" in self.args:
             self.mode = "continue"
+        elif "--abort" in self.args:
+            self.mode = "abort"
+        elif "--quit" in self.args:
+            self.mode = "quit"
 
     def handle_continue(self) -> None:
         try:
             self.repo.index.load()
-            self.write_cherry_pick_commit()
-            self.exit(0)
+            if self.repo.pending_commit().is_in_progress():
+                self.write_cherry_pick_commit()
+            self.sequencer.load()
+            self.sequencer.drop_command()
+            self.resume_sequencer()
         except PendingCommit.Error as e:
             self.stderr.write(f"fatal: {e}\n")
             self.exit(128)
+
     def pick(self, commit: Commit):
         inputs = self.pick_merge_inputs(commit)
 
@@ -79,6 +126,8 @@ class CherryPick(WriteCommitMixin, Base):
         self.print_commit(commit)
 
     def fail_on_conflict(self, inputs, message: str) -> None:
+        self.sequencer.dump()
+
         self.repo.pending_commit().start(inputs.right_oid, self.merge_type())
         def editor_setup(editor: Editor):
             editor.println(message)
