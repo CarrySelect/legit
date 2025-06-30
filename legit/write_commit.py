@@ -32,6 +32,12 @@ COMMIT_NOTES = textwrap.dedent(
 
 
 class WriteCommitMixin:
+    def current_author(self) -> Author:
+        name  = self.env.get("GIT_AUTHOR_NAME",  "A. U. Thor")
+        email = self.env.get("GIT_AUTHOR_EMAIL", "author@example.com")
+
+        return Author(name, email, datetime.now().astimezone())
+
     def commit_message_path(self) -> Path:
         return self.repo.git_path / "COMMIT_EDITMSG"
 
@@ -92,13 +98,10 @@ class WriteCommitMixin:
 
     def write_commit(self, parents, message):
         tree = self.write_tree()
-
-        name  = self.env.get("GIT_AUTHOR_NAME",  "A. U. Thor")
-        email = self.env.get("GIT_AUTHOR_EMAIL", "author@example.com")
-
-        author = Author(name, email, datetime.now().astimezone())
         
-        commit = CommitObject([p for p in parents if p], tree.oid, author, message)
+        author = self.current_author()
+        
+        commit = CommitObject([p for p in parents if p], tree.oid, author, author, message)
         self.repo.database.store(commit)
         self.repo.refs.update_head(commit.oid)
 

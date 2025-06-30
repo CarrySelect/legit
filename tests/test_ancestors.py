@@ -23,7 +23,7 @@ class GraphBuilder:
     def commit(self, parents, message):
         parent_oids = [self.commits[p] for p in parents]
         author = Author("A. U. Thor", "author@example.com", datetime.datetime.now().astimezone())
-        commit = Commit(parent_oids, "0" * 40, author, message)
+        commit = Commit(parent_oids, "0" * 40, author, author, message)
         self.db.store(commit)
         self.commits[message] = commit.oid
 

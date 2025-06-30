@@ -5,10 +5,18 @@ from legit.author import Author
 
 
 class Commit:
-    def __init__(self, parents: list[Optional[str]], tree: str, author: Author, message: str) -> None:
+    def __init__(
+        self,
+        parents: list[Optional[str]],
+        tree: str,
+        author: Author,
+        committer: Author,
+        message: str
+    ) -> None:
         self.parents: list[Optional[str]] = parents
         self.tree: str = tree
         self.author: Author = author
+        self.committer = committer
         self.message: str = message
         self._oid: str | None = None
 
@@ -69,6 +77,7 @@ class Commit:
             parents=headers.get("parent", []),
             tree=tree_values[0],
             author=Author.parse(author_values[0]),
+            committer=Author.parse(headers.get("committer")[0]),
             message=message,
         )
 
@@ -88,7 +97,7 @@ class Commit:
         return "commit"
 
     def date(self) -> datetime:
-        return self.author.time
+        return self.committer.time
 
     def to_bytes(self) -> bytes:
         lines = [
@@ -102,7 +111,7 @@ class Commit:
 
         lines.extend([
             f"author {self.author}",
-            f"committer {self.author}",
+            f"committer {self.committer}",
             "",
             self.message,
         ])

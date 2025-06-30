@@ -5,6 +5,7 @@ from legit.cmd_base import Base
 from legit.write_commit import WriteCommitMixin
 from legit.editor import Editor
 from legit.revision import Revision
+from legit.commit import Commit as CommitObject
 
 
 COMMIT_NOTES = textwrap.dedent(
@@ -41,12 +42,17 @@ class Commit(WriteCommitMixin, Base):
                     self.edit = True
                 except StopIteration:
                     pass
+
+        self.amend = '--amend' in self.args
  
     def run(self) -> None:
         self.define_options()    
 
         self.repo = Repository(self.dir / ".git")
         self.repo.index.load()
+    
+        if self.amend:
+            self.handle_amend()
 
         if self.repo.pending_commit().is_in_progress():
             self.resume_merge()
@@ -58,6 +64,23 @@ class Commit(WriteCommitMixin, Base):
         self.print_commit(commit)
 
         self.exit(0)
+
+    def handle_amend(self) -> None:
+        oid = self.repo.database.load(self.repo.refs.read_head())
+        tree = self.write_tree()
+
+        message = self.compose_message(oid.message)
+        committer = self.current_author()
+
+        new = CommitObject(oid.parents, tree.oid, oid.author, committer, message)
+
+        self.repo.database.store(new)
+        self.repo.refs.update_head(new.oid)
+
+        self.print_commit(new)
+
+        self.exit(0)
+
 
     def reused_message(self) -> Optional[str]:
         if not self.reuse:
