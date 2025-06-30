@@ -1,3 +1,5 @@
+from typing import Optional
+import textwrap
 from legit.cmd_base import Base
 from legit.repository import Repository, PendingCommit
 from legit.revision import Revision
@@ -7,10 +9,24 @@ from legit.bases import Bases
 from legit.inputs import Inputs
 from legit.resolve import Resolve
 from legit.write_commit import CONFLICT_MESSAGE
+from legit.editor import Editor
+
+
+COMMIT_NOTES = textwrap.dedent(
+    """\
+    Please enter a commit message to explain why this merge is necessary,
+    especially if it merges an updated upstream into a topic branch.
+
+    Lines starting with '#' will be ignored, and empty message aborts
+    the commit.
+    """
+)
 
 
 class Merge(WriteCommitMixin, Base):
     def run(self) -> None:
+        self.define_write_commit_options()
+
         self.repo = Repository(self.dir / ".git")
         self.pending_commit: PendingCommit = self.repo.pending_commit()
 
@@ -38,12 +54,24 @@ class Merge(WriteCommitMixin, Base):
         if self.inputs.are_fast_forward():
             self.handle_fast_forward()
         
-        self.pending_commit.start(self.inputs.right_oid, self.stdin.read())
+        self.pending_commit.start(self.inputs.right_oid)
        
         self.resolve_merge()
         self.commit_merge()
         
         self.exit(0)
+
+    def compose_message(self) -> Optional[str]:
+        def editor_setup(editor: Editor):
+            editor.println(self.read_message() or self.default_commit_message())
+            editor.println("")
+            editor.note(COMMIT_NOTES)
+    
+            if not self.edit:
+                editor.close()
+    
+        return Editor.edit(self.pending_commit.message_path, block=editor_setup)
+
 
     def handle_abort(self) -> None:
         try:
@@ -81,12 +109,28 @@ class Merge(WriteCommitMixin, Base):
 
         self.repo.index.write_updates()
         if self.repo.index.is_conflict():
-            self.println("Automatic merge failed; fix conflicts and then commit the result.")
-            self.exit(1)
+            self.fail_on_conflict()
 
+    def fail_on_conflict(self) -> None:
+        def editor_setup(editor: Editor):
+            editor.println(self.read_message() or self.default_commit_message())
+            editor.println("")
+            editor.note("Conflicts:")
+            for name in self.repo.index.conflict_paths():
+                editor.note(f"\t{name}")
+            editor.close()
+        
+        Editor.edit(self.pending_commit.message_path, block=editor_setup)
+        
+        self.println(f"Automatic merge failed; fix conflicts and then commit the result.")
+        self.exit(1)
+
+    def default_commit_message(self) -> str:
+        return f"Merge commit '{self.inputs.right_name}"
+       
     def commit_merge(self) -> None:
         parents = [self.inputs.left_oid, self.inputs.right_oid]
-        message = self.pending_commit.merge_message
+        message = self.compose_message()
         self.write_commit(parents, message)
         self.pending_commit.clear()
 

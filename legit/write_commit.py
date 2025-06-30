@@ -1,9 +1,11 @@
 from pathlib import Path
 import textwrap
 from datetime import datetime
+from typing import Optional
 from legit.author import Author
 from legit.commit import Commit as CommitObject
 from legit.tree import Tree
+from legit.editor import Editor
 
 
 CONFLICT_MESSAGE: str = textwrap.dedent("""\
@@ -11,6 +13,22 @@ CONFLICT_MESSAGE: str = textwrap.dedent("""\
     hint: as appropriate to mark resolution and make a commit.
     fatal: Exiting because of an unresolved conflict.
 """)
+
+MERGE_NOTES: str = textwrap.dedent(
+    """\
+    It looks like you may be committing a merge.
+    If this is not correct, please remove the file
+    \t.git/MERGE_HEAD
+    and try again.
+    """
+)
+
+COMMIT_NOTES = textwrap.dedent(
+    """\
+    Please enter the commit message for your changes. Lines starting
+    with '#' will be ignored, and an empty message aborts the commit.
+    """
+)
 
 
 class WriteCommitMixin:
@@ -94,7 +112,8 @@ class WriteCommitMixin:
     def resume_merge(self):
         self.handle_conflicted_index()
         parents = [self.repo.refs.read_head(), self.repo.pending_commit().merge_oid]
-        self.write_commit(parents, self.repo.pending_commit().merge_message)
+        message = self.compose_merge_message(MERGE_NOTES)
+        self.write_commit(parents, message)
         self.repo.pending_commit().clear()
         self.exit(0)
 
@@ -108,5 +127,18 @@ class WriteCommitMixin:
 
         self.exit(128)
 
+
+    def compose_merge_message(self, notes: Optional[str] = None) -> Optional[str]:
+        def editor_setup(editor: Editor):
+            editor.println(self.repo.pending_commit().merge_message)
+            if notes is not None:
+                editor.note(notes)
+            editor.println("")
+            editor.note(COMMIT_NOTES)
+    
+            if not self.edit:
+                editor.close()
+    
+        return Editor.edit(self.commit_message_path(), block=editor_setup)
 
 

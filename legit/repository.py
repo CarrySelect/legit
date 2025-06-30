@@ -79,12 +79,10 @@ class PendingCommit:
     def merge_message(self):
         return self.message_path.read_text()
     
-    def start(self, oid: str, msg: str) -> None:
+    def start(self, oid: str) -> None:
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
         with os.fdopen(os.open(self.head_path, flags, 0o644), "w") as f:
             f.write(oid)
-        with os.fdopen(os.open(self.message_path, flags, 0o644), "w") as f:
-            f.write(msg)
 
     def clear(self) -> None:
         try:

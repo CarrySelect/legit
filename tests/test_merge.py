@@ -58,7 +58,7 @@ def merge3(commit_tree, legit_cmd):
         commit_tree("C", right)
 
         legit_cmd("checkout", "master")
-        cmd, stdin, stdout, stderr = legit_cmd("merge", "topic", stdin_data="M")
+        cmd, stdin, stdout, stderr = legit_cmd("merge", "topic", "-m", "M")
         return cmd, stdin, stdout, stderr
 
     return _merge3
@@ -71,12 +71,12 @@ def assert_clean_merge(legit_cmd, load_commit):
     old_head = load_commit("@^")
     merge_head = load_commit("topic")
 
-    assert commit.message == "M"
+    assert commit.message.strip() == "M"
     assert commit.parents == [old_head.oid, merge_head.oid]
 
 def assert_no_merge(legit_cmd, load_commit):
     commit = load_commit("@")
-    assert commit.message == "B"
+    assert commit.message.strip() == "B"
     assert len(commit.parents) == 1
 
 def assert_index(repo, *expected_entries):
@@ -107,7 +107,7 @@ class TestMergingAnAncestor:
 
     def test_it_does_not_change_repository_state(self, legit_cmd, load_commit):
         commit = load_commit("@")
-        assert commit.message == "C"
+        assert commit.message.strip() == "C"
 
         cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
         assert_stdout(stdout, "")
@@ -123,7 +123,7 @@ class TestFastForwardMerge:
         legit_cmd("branch", "topic", "@^^")
         legit_cmd("checkout", "topic")
 
-        self.cmd, self.stdin, self.stdout, self.stderr = legit_cmd("merge", "master", stdin_data="M")
+        self.cmd, self.stdin, self.stdout, self.stderr = legit_cmd("merge", "master", "-m", "M")
 
     def test_it_prints_the_fast_forward_message(self, repo, resolve_revision):
         a, b = map(resolve_revision, ["master^^", "master"])
@@ -137,7 +137,7 @@ class TestFastForwardMerge:
     
     def test_it_updates_the_current_branch_head(self, load_commit, legit_cmd):
         commit = load_commit("@")
-        assert commit.message == "C"
+        assert commit.message.strip() == "C"
 
         cmd, stdin, stdout, stderr = legit_cmd("status", "--porcelain")
         assert_stdout(stdout, "")
@@ -844,7 +844,7 @@ class TestMultipleCommonAncestors:
         legit_cmd("checkout", "master")
 
     def test_it_performs_the_first_merge(self, legit_cmd, repo_path):
-        cmd, stdin, stdout, stderr = legit_cmd("merge", "joiner", stdin_data="merge joiner")
+        cmd, stdin, stdout, stderr = legit_cmd("merge", "joiner", "-m", "merge joiner")
         assert cmd.status == 0
 
         assert_workspace(repo_path, {
@@ -857,11 +857,11 @@ class TestMultipleCommonAncestors:
         assert_stdout(stdout, "")
 
     def test_it_performs_the_second_merge(self, legit_cmd, commit_tree, repo_path):
-        legit_cmd("merge", "joiner", stdin_data="merge joiner")
+        legit_cmd("merge", "joiner", "-m", "merge joiner")
 
         commit_tree("H", {"f.txt": "4"})
         
-        cmd, stdin, stdout, stderr = legit_cmd("merge", "topic", stdin_data="merge topic")
+        cmd, stdin, stdout, stderr = legit_cmd("merge", "topic", "-m", "merge topic")
         assert cmd.status == 0
 
         assert_workspace(repo_path, {
@@ -893,7 +893,7 @@ class TestConflictResolution:
             "fatal: Exiting because of an unresolved conflict.\n"
         )
         assert_stderr(stderr, expected)
-        assert load_commit("@").message == "B"
+        assert load_commit("@").message.strip() == "B"
 
     def test_prevents_merge_continue_with_unmerged_entries(self, legit_cmd, load_commit):
         cmd, _, _, stderr = legit_cmd("merge", "--continue")
@@ -905,15 +905,15 @@ class TestConflictResolution:
             "fatal: Exiting because of an unresolved conflict.\n"
         )
         assert_stderr(stderr, expected)
-        assert load_commit("@").message == "B"
+        assert load_commit("@").message.strip() == "B"
 
     def test_commits_a_merge_after_resolving_conflicts(self, legit_cmd, load_commit):
         legit_cmd("add", "f.txt")
         cmd, _, _, _ = legit_cmd("commit")
         assert cmd.status == 0
         commit = load_commit("@")
-        assert commit.message == "M"
-        parents = [load_commit(oid).message for oid in commit.parents]
+        assert commit.message.strip() == "M"
+        parents = [load_commit(oid).message.strip() for oid in commit.parents]
         assert parents == ["B", "C"]
 
     def test_allows_merge_continue_after_resolving_conflicts(self, legit_cmd, load_commit):
@@ -921,8 +921,8 @@ class TestConflictResolution:
         cmd, _, _, _ = legit_cmd("merge", "--continue")
         assert cmd.status == 0
         commit = load_commit("@")
-        assert commit.message == "M"
-        parents = [load_commit(oid).message for oid in commit.parents]
+        assert commit.message.strip() == "M"
+        parents = [load_commit(oid).message.strip() for oid in commit.parents]
         assert parents == ["B", "C"]
 
     def test_prevents_merge_continue_when_none_in_progress(self, legit_cmd):

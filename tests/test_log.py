@@ -434,7 +434,7 @@ def graph_of_commits_setup(commit_tree, legit_cmd, resolve_revision):
         commit_tree(n, {"g.txt": n, "h.txt": f"one\ntwo\n{n}\n"}, time + timedelta(seconds=2))
 
     legit_cmd("checkout", "master")
-    legit_cmd("merge", "topic^", stdin_data="J")
+    legit_cmd("merge", "topic^", "-m", "J")
 
     commit_tree("K", {"f.txt": "K"}, time + timedelta(seconds=3))
 
@@ -613,7 +613,7 @@ def setup_undone_changes(commit_tree, legit_cmd, graph_of_commits_setup):
     commit_tree("C", {"g.txt": "C"}, time + timedelta(seconds=1))
     commit_tree("0", {"g.txt": "0"}, time + timedelta(seconds=1))
 
-    legit_cmd("merge", "topic^", stdin_data="J")
+    legit_cmd("merge", "topic^", "-m", "J")
     commit_tree("K", {"f.txt": "K"}, time + timedelta(seconds=3))
     
     return graph_of_commits_setup

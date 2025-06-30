@@ -36,6 +36,13 @@ class Index:
         self.changed: bool = False
         self.parents: dict[Path, set[Path]] = defaultdict(set)
 
+    def conflict_paths(self):
+        paths = set()
+        for entry in self.entries.values():
+            if entry.stage != 0:
+                paths.add(entry)
+        return paths
+
     def add_from_db(self, path: Path, item) -> None:
         self.store_entry(Entry.create_from_db(path, item, 0))
         self.changed = True

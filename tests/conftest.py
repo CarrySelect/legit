@@ -56,7 +56,7 @@ def repo(repo_path):
     return Repository(git_dir)
 
 @pytest.fixture
-def commit(monkeypatch, legit_cmd):
+def commit(legit_cmd):
     def _commit(message: str, when: Optional[datetime] = None):
         env = {
             "GIT_AUTHOR_NAME": "A. U. Thor",
@@ -67,7 +67,7 @@ def commit(monkeypatch, legit_cmd):
             when = datetime.now()
     
         with freeze_time(when):
-            return legit_cmd("commit", env=env, stdin_data=message)
+            return legit_cmd("commit", "-m", message, env=env)
 
     return _commit
 
