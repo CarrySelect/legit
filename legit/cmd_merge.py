@@ -89,7 +89,7 @@ class Merge(WriteCommitMixin, Base):
     def handle_continue(self) -> None:
         self.repo.index.load()
         try:
-            self.resume_merge()
+            self.resume_merge("merge")
         except PendingCommit.Error as e:
             self.stderr.write(f"fatal: {e}\n")
             self.exit(128)

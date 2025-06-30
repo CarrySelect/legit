@@ -62,35 +62,49 @@ class HardReset:
 class PendingCommit:
     class Error(Exception):
         pass
+    
+    HEAD_FILES = {
+        "merge": "MERGE_HEAD",
+        "cherry_pick": "CHERRY_PICK_HEAD",
+    }
 
     def __init__(self, path: Path) -> None:
-        self.head_path = path / "MERGE_HEAD"
+        self.path = path
         self.message_path = path / "MERGE_MSG"
     
     @property
-    def merge_oid(self):
+    def merge_oid(self, ty: str = "merge"):
+        head_path = self.path / PendingCommit.HEAD_FILES[ty]
         try:
-            return self.head_path.read_text().strip()
+            return head_path.read_text().strip()
         except FileNotFoundError:
-            name = self.head_path.name
+            name = head_path.name
             raise PendingCommit.Error(f"There is no merge in progress ({name} missing).")
 
     @property
     def merge_message(self):
         return self.message_path.read_text()
     
-    def start(self, oid: str) -> None:
+    def start(self, oid: str, ty: str = "merge") -> None:
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-        with os.fdopen(os.open(self.head_path, flags, 0o644), "w") as f:
+        with os.fdopen(os.open(PendingCommit.HEAD_FILES[ty], flags, 0o644), "w") as f:
             f.write(oid)
 
-    def clear(self) -> None:
+    def clear(self, ty: str = "merge") -> None:
+        head_path = self.path / PendingCommit.HEAD_FILES[ty]
         try:
-            self.head_path.unlink()
+            head_path.unlink()
             self.message_path.unlink()
         except FileNotFoundError:
-            name = self.head_path.name
+            name = head_path.name
             raise PendingCommit.Error(f"There is no merge to abort ({name} missing).")
 
     def is_in_progress(self) -> bool:
-        return self.head_path.exists()
+        return self.merge_type() is not None
+
+    def merge_type(self) -> Optional[str]:
+        for ty, name in PendingCommit.HEAD_FILES.items():
+            path = self.path / name
+            if path.exists():
+                return ty
+        return None

@@ -1,0 +1,98 @@
+import textwrap
+from legit.cmd_base import Base
+from legit.commit import Commit
+from legit.write_commit import WriteCommitMixin
+from legit.revision import Revision
+from legit.repository import Repository, PendingCommit
+from legit.inputs import CherryPick as CherryPickInput
+from legit.resolve import Resolve
+from legit.editor import Editor
+
+
+CONFLICT_NOTES = textwrap.dedent(
+    """\
+    after resolving the conflicts, mark the corrected paths
+    with 'legit add <paths>' or 'legit rm <paths>'
+    and commit the result with 'legit commit'
+    """
+)
+
+
+class CherryPick(WriteCommitMixin, Base):
+    def run(self) -> None:
+        self.repo: Repository = Repository(self.dir / ".git")
+        
+        if self.mode == "continue":
+            self.handle_continue()
+
+        revision = Revision(self.repo, self.args[0])
+        commit = self.repo.database.load(revision.resolve())
+        
+        self.pick(commit)
+
+        self.exit(0)
+
+    def define_options(self) -> None:
+        self.mode = "run"
+        if "--continue" in self.args:
+            self.mode = "continue"
+
+    def handle_continue(self) -> None:
+        try:
+            self.repo.index.load()
+            self.write_cherry_pick_commit()
+            self.exit(0)
+        except PendingCommit.Error as e:
+            self.stderr.write(f"fatal: {e}\n")
+            self.exit(128)
+    def pick(self, commit: Commit):
+        inputs = self.pick_merge_inputs(commit)
+
+        self.resolve_merge(inputs)
+
+        if self.repo.index.is_conflict():
+            self.fail_on_conflict(inputs, commit.message)
+
+        picked = Commit([inputs.left_oid], self.write_tree().oid, commit.author, self.current_author(), commit.message)
+
+        self.finish_commit(picked)
+
+    def pick_merge_inputs(self, commit: Commit) -> None:
+        short = self.repo.database.short_oid(commit.oid)
+
+        left_name = "HEAD"
+        left_oid = self.repo.refs.read_head()
+
+        right_name = f"{short}... {commit.title_line().strip()}"
+        right_oid = commit.oid
+
+        return CherryPickInput(left_name, right_name, left_name, right_oid, [commit.parent])
+
+    def resolve_merge(self, inputs) -> None:
+        self.repo.index.load_for_update()
+        Resolve(self.repo, inputs).execute()
+        self.repo.index.write_updates()
+
+    def finish_commit(self, commit: Commit) -> None:
+        self.repo.database.store(commit)
+        self.repo.refs.update_head(commit.oid)
+        self.print_commit(commit)
+
+    def fail_on_conflict(self, inputs, message: str) -> None:
+        self.repo.pending_commit().start(inputs.right_oid, self.merge_type())
+        def editor_setup(editor: Editor):
+            editor.println(message)
+            editor.println("")
+            editor.note("Conflicts:")
+            for name in self.repo.index.conflict_paths():
+                editor.note(f"\t{name}")
+            editor.close()
+        
+        Editor.edit(self.repo.pending_commit().message_path, block=editor_setup)
+        
+        self.stderr.write(f"error: could not apply {inputs.right_name}\n")
+        for line in CONFLICT_NOTES.splitlines():
+            self.stderr.write(f"hint: {line}\n")
+        self.exit(1)
+
+

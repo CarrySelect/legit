@@ -15,7 +15,7 @@ CONFLICT_MESSAGE: str = textwrap.dedent("""\
 """)
 
 MERGE_NOTES: str = textwrap.dedent(
-    """\
+    """
     It looks like you may be committing a merge.
     If this is not correct, please remove the file
     \t.git/MERGE_HEAD
@@ -30,6 +30,14 @@ COMMIT_NOTES = textwrap.dedent(
     """
 )
 
+CHERRY_PICK_NOTES = textwrap.dedent(
+    """
+    It looks like you may be committing a cherry-pick.
+    If this is not correct, please remove the file
+    \t.git/CHERRY_PICK_HEAD
+    and try again.
+    """
+)
 
 class WriteCommitMixin:
     def current_author(self) -> Author:
@@ -112,13 +120,36 @@ class WriteCommitMixin:
         root.traverse(lambda tree: self.repo.database.store(tree))
         return root
 
-    def resume_merge(self):
+    def resume_merge(self, ty: str):
+        if ty == "merge":
+            self.write_merge_commit()
+        elif ty == "cherry_pick":
+            self.write_cherry_pick_commit()
+
+        self.exit(0)
+
+    def write_merge_commit(self) -> None:
         self.handle_conflicted_index()
         parents = [self.repo.refs.read_head(), self.repo.pending_commit().merge_oid]
         message = self.compose_merge_message(MERGE_NOTES)
         self.write_commit(parents, message)
-        self.repo.pending_commit().clear()
-        self.exit(0)
+        self.repo.pending_commit().clear("merge")
+
+    def write_cherry_pick_commit(self) -> None:
+        self.handle_conflicted_index()
+
+        self.parents = [self.repo.refs.read_head()]
+        message = self.compose_merge_message(CHERRY_PICK_NOTES)
+
+        pick_oid = self.repo.pending_commit().merge_oid("cherry_pick")
+        commit = self.repo.database.load(pick_oid)
+
+        picked = CommitObject(parents, self.write_tree().oid, commit.author, self.current_author(), message)
+
+        self.repo.database.store(picked)
+        self.repo.refs.update_head(picked.oid)
+
+        self.repo.pending_commit().clear("cherry_pick")
 
     def handle_conflicted_index(self) -> None:
         if not self.repo.index.is_conflict():

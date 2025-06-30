@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from legit.repository import Repository
 from legit.bases import Bases
 from legit.revision import Revision
@@ -23,3 +25,12 @@ class Inputs:
 
     def are_fast_forward(self) -> bool:
         return self.base_oids == [self.left_oid]
+
+
+@dataclass
+class CherryPick:
+    left_name: str
+    right_name: str
+    left_oid: str
+    right_oid: str
+    base_oids: list[str]

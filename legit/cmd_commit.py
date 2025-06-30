@@ -54,8 +54,9 @@ class Commit(WriteCommitMixin, Base):
         if self.amend:
             self.handle_amend()
 
-        if self.repo.pending_commit().is_in_progress():
-            self.resume_merge()
+        merge_type = self.repo.pending_commit().merge_type()
+        if merge_type is not None:
+            self.resume_merge(merge_type)
 
         parent = self.repo.refs.read_head()
         message: str = self.compose_message(self.read_message() or self.reused_message())
