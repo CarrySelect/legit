@@ -13,6 +13,47 @@ CONFLICT_MESSAGE: str = textwrap.dedent("""\
 
 
 class WriteCommitMixin:
+    def read_message(self) -> str:
+        if self.message is not None:
+            return f"{self.message}\n"
+        elif self.file is not None:
+            return self.file.read_text()
+
+    def define_write_commit_options(self):
+        self.message = None
+        self.file = None
+    
+        args_iter = iter(self.args)
+        for arg in args_iter:
+            if arg.startswith('--message='):
+                self.message = arg.split('=', 1)[1]
+            elif arg == '-m':
+                try:
+                    self.message = next(args_iter)
+                except StopIteration:
+                    pass
+    
+            elif arg.startswith('--file='):
+                file_path = arg.split('=', 1)[1]
+                self.file = self.expanded_path(file_path)
+            elif arg == '-F':
+                try:
+                    file_path = next(args_iter)
+                    self.file = self.expanded_path(file_path)
+                except StopIteration:
+                   pass
+    
+    def print_commit(self, commit: CommitObject) -> None:
+        ref = self.repo.refs.current_ref()
+        info = "detached HEAD" if ref.is_head() else ref.short_name()
+        oid = self.repo.database.short_oid(commit.oid)
+
+        if commit.parent is None:
+            info += " (root-commit)"
+        info += f" {oid}"
+
+        self.println(f"[{info}] {commit.title_line()}")
+
     def write_commit(self, parents, message):
         tree = self.write_tree()
 

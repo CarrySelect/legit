@@ -13,19 +13,19 @@ from legit.write_commit import WriteCommitMixin
 
 class Commit(WriteCommitMixin, Base):
     def run(self) -> None:
+        self.define_write_commit_options()
+
         self.repo = Repository(self.dir / ".git")
-        
         self.repo.index.load()
 
         if self.repo.pending_commit().is_in_progress():
             self.resume_merge()
 
         parent = self.repo.refs.read_head()
-        message: str = self.stdin.read()
+        message: str = self.read_message()
         commit = self.write_commit([parent] if parent else [], message)
-    
-        is_root: str = "(root-commit) " if parent is None else ""
-        self.println(f"[{is_root}{commit.oid}] {message.splitlines()[0]}")
+        
+        self.print_commit(commit)
 
         self.exit(0)
 
