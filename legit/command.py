@@ -48,7 +48,9 @@ class Command:
     ) -> Base:
         name = argv[1]
         args = argv[2:]
-
+        
+        print(name)
+    
         if name not in Command.COMMANDS:
             raise Command.Unknown(f"{name} is not a legit command")
         

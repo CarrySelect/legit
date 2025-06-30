@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 import sys
 from pathlib import Path
 
@@ -59,16 +60,30 @@ def add(paths: tuple[Path, ...]) -> None:
 
 
 @cli.command()
+@click.option(
+    "-m", "--message", "message",
+    type=str,
+    help="Use the given <message> as the commit message."
+)
+@click.option(
+    "-F", "--file", "file_path",
+    type=click.Path(exists=True, dir_okay=False, resolve_path=True),
+    help="Take the commit message from the given file."
+)
 @click.pass_context
-def commit(ctx: click.Context) -> None:
-    """Record changes to the repository using the message from *STDIN*."""
+def commit(ctx: click.Context, message: Optional[str], file_path: Optional[str]) -> None:
+    """Record changes to the repository."""
 
-    if sys.stdin.isatty():
-        click.echo("error: commit message required via stdin", err=True)
-        ctx.exit(1)
+    if message and file_path:
+        raise click.UsageError("Options -m/--message and -F/--file are mutually exclusive.")
 
-    run_cmd("commit")
-
+    cmd_args = ["commit"]
+    if message:
+        cmd_args.extend(["-m", message])
+    elif file_path:
+        cmd_args.extend(["-F", file_path])
+   
+    run_cmd(*cmd_args)
 
 @cli.command()
 @click.option("--porcelain", is_flag=True, help="Machine‑readable output.")

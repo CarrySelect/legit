@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import MutableMapping, TextIO
 from legit.cmd_color import Color
 from legit.pager import Pager
+from legit.editor import Editor
 
 
 class Base:
@@ -23,6 +24,18 @@ class Base:
         self.status: int | None = None
         self.isatty: bool = stdout.isatty()
         self.pager: Pager | None = None
+
+    def edit_file(self, path: Path):
+        editor = Editor.edit(path, self.editor_command())
+        yield editor
+        if not self.isatty:
+            editor.close()
+
+    def editor_command(self) -> str:
+        git_editor = self.env.get("GIT_EDITOR")
+        visual = self.env.get("VISUAL")
+        editor = self.env.get("EDITOR")
+        return git_editor or visual or editor
 
     def setup_pager(self) -> None:
         if self.pager is not None:

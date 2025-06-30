@@ -1,3 +1,4 @@
+from pathlib import Path
 import textwrap
 from datetime import datetime
 from legit.author import Author
@@ -13,6 +14,9 @@ CONFLICT_MESSAGE: str = textwrap.dedent("""\
 
 
 class WriteCommitMixin:
+    def commit_message_path(self) -> Path:
+        return self.repo.git_path / "COMMIT_EDITMSG"
+
     def read_message(self) -> str:
         if self.message is not None:
             return f"{self.message}\n"
@@ -22,27 +26,41 @@ class WriteCommitMixin:
     def define_write_commit_options(self):
         self.message = None
         self.file = None
+        self.edit = 'auto'
     
         args_iter = iter(self.args)
         for arg in args_iter:
-            if arg.startswith('--message='):
+            if arg in ('-e', '--edit'):
+                self.edit = True
+            elif arg == '--no-edit':
+                self.edit = False
+    
+            elif arg.startswith('--message='):
                 self.message = arg.split('=', 1)[1]
+                if self.edit == 'auto': 
+                    self.edit = False
             elif arg == '-m':
                 try:
                     self.message = next(args_iter)
+                    if self.edit == 'auto':
+                        self.edit = False
                 except StopIteration:
                     pass
     
             elif arg.startswith('--file='):
                 file_path = arg.split('=', 1)[1]
                 self.file = self.expanded_path(file_path)
+                if self.edit == 'auto':
+                    self.edit = False
             elif arg == '-F':
                 try:
                     file_path = next(args_iter)
                     self.file = self.expanded_path(file_path)
+                    if self.edit == 'auto':
+                        self.edit = False
                 except StopIteration:
-                   pass
-    
+                    pass
+
     def print_commit(self, commit: CommitObject) -> None:
         ref = self.repo.refs.current_ref()
         info = "detached HEAD" if ref.is_head() else ref.short_name()
