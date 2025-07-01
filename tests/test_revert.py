@@ -280,3 +280,110 @@ class TestRevert:
         def test_removes_the_merge_state(self, repo):
             assert not repo.pending_commit().is_in_progress()
 
+class TestRevertWithMerges:
+    """
+    Tests for `legit revert` with merge commits.
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup_merge_history(self, write_file, legit_cmd, commit, repo_path):
+        """
+        Sets up a repository with a master and topic branch, including merges.
+
+        History created:
+          f---f---f---o---o---h [master]
+                  \\     /   /
+                  g---g---h [topic]
+        """
+        self.time = datetime.now()
+        self.repo_path = repo_path
+
+        def commit_tree(message, files):
+            self.time += timedelta(seconds=10)
+            for path, contents in files.items():
+                write_file(path, contents)
+            legit_cmd("add", ".")
+            commit(message, self.time)
+
+        # Create initial commits on master
+        for message in ["one", "two", "three"]:
+            commit_tree(message, {"f.txt": message})
+
+        # Create and switch to topic branch
+        legit_cmd("branch", "topic", "@^")
+        legit_cmd("checkout", "topic")
+
+        # Create commits on topic branch
+        commit_tree("four", {"g.txt": "four"})
+        commit_tree("five", {"g.txt": "five"})
+        commit_tree("six", {"h.txt": "six"})
+
+        # Switch back to master and merge
+        legit_cmd("checkout", "master")
+        legit_cmd("merge", "topic^", "-m", "merge topic^")
+        legit_cmd("merge", "topic", "-m", "merge topic")
+
+        # Final commit on master
+        commit_tree("seven", {"h.txt": "seven"})
+
+    def test_refuses_to_revert_merge_without_mainline(self, legit_cmd, resolve_revision):
+        """Corresponds to: 'refuses to revert a merge without specifying a parent'"""
+        cmd, _, _, stderr = legit_cmd("revert", "@^")
+        assert_status(cmd, 1)
+
+        oid = resolve_revision("@^")
+        expected_error = f"error: commit {oid} is a merge but no -m option was given\n"
+        assert_stderr(stderr, expected_error)
+
+    def test_refuses_to_revert_non_merge_with_mainline(self, legit_cmd, resolve_revision):
+        """Corresponds to: 'refuses to revert a non-merge commit with mainline'"""
+        cmd, _, _, stderr = legit_cmd("revert", "-m", "1", "@")
+        assert_status(cmd, 1)
+
+        oid = resolve_revision("@")
+        expected_error = f"error: mainline was specified but commit {oid} is not a merge\n"
+        assert_stderr(stderr, expected_error)
+
+    def test_reverts_merge_based_on_first_parent(self, legit_cmd, repo):
+        """Corresponds to: 'reverts a merge based on its first parent'"""
+        cmd, _, _, _ = legit_cmd("revert", "-m", "1", "@~2")
+        assert_status(cmd, 0)
+
+        expected_state = {"f.txt": "three", "h.txt": "seven"}
+        assert_index(repo, expected_state)
+        assert_workspace(self.repo_path, expected_state)
+
+    def test_reverts_merge_based_on_second_parent(self, legit_cmd, repo):
+        """Corresponds to: 'reverts a merge based on its second parent'"""
+        cmd, _, _, _ = legit_cmd("revert", "-m", "2", "@~2")
+        assert_status(cmd, 0)
+
+        expected_state = {
+            "f.txt": "two",
+            "g.txt": "five",
+            "h.txt": "seven",
+        }
+        assert_index(repo, expected_state)
+        assert_workspace(self.repo_path, expected_state)
+
+    def test_resumes_reverting_merges_after_conflict(self, legit_cmd, repo):
+        """Corresponds to: 'resumes reverting merges after a conflict'"""
+        cmd, _, _, _ = legit_cmd("revert", "-m", "1", "@^", "@^^")
+        assert_status(cmd, 1)
+
+        cmd, _, stdout, _ = legit_cmd("status", "--porcelain")
+        assert_stdout(stdout, "UD h.txt\n")
+
+        # Resolve conflict and continue
+        legit_cmd("rm", "-f", "h.txt")
+        cmd, _, _, _ = legit_cmd("revert", "--continue")
+        assert_status(cmd, 0)
+
+        # Check commit history
+        messages = get_rev_list_messages(repo, "@~3..")
+        assert messages == ['Revert "merge topic^"', 'Revert "merge topic"', "seven"]
+
+        # Check final state
+        expected_state = {"f.txt": "three"}
+        assert_index(repo, expected_state)
+        assert_workspace(self.repo_path, expected_state)
