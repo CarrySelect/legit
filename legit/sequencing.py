@@ -19,23 +19,36 @@ class SequencingMixin:
         self.define_write_commit_options()
         
         self.mode = "run"
+        self.mainline = None
+    
+        positional = []
 
         args_iter = iter(self.args)
         for arg in args_iter:
             if arg.startswith('--mainline='):
-                self.mainline = arg.split('=', 1)[1]
+                self.mainline = int(arg.split('=', 1)[1])
+                continue
             elif arg == '-m':
                 try:
-                    self.mainline = next(args_iter)
+                    self.mainline = int(next(args_iter))
                 except StopIteration:
                     pass
+                continue
 
             elif arg == "--continue":
                 self.mode = "continue"
+                continue
             elif arg == "--abort":
                 self.mode = "abort"
+                continue
             elif arg == "--quit":
                 self.mode = "quit"
+                continue
+            
+            else:
+                positional.append(arg)
+
+        self.args = positional
         
 
     def run(self) -> None:
@@ -62,13 +75,13 @@ class SequencingMixin:
             if mainline:
                 return commit.parents[mainline - 1]
 
-            self.stderr.write(f"error: commit {commit.oid} is a merge but no -m option was given")
+            self.stderr.write(f"error: commit {commit.oid} is a merge but no -m option was given\n")
             self.exit(1)
         else:
             if not mainline:
                 return commit.parent
 
-            self.stderr.write(f"error: mainline was specified but commit {commit.oid} is not a merge")
+            self.stderr.write(f"error: mainline was specified but commit {commit.oid} is not a merge\n")
             self.exit(1)
 
     def resolve_merge(self, inputs) -> None:
@@ -104,10 +117,11 @@ class SequencingMixin:
         try:
             self.repo.index.load()
             
-            if self.repo.pending_commit().merge_type() == "cherry_pick":
-                self.write_cherry_pick_commit()
-            elif self.repo.pending_commit().merge_type() == "revert":
-                self.write_revert_commit()
+            match self.repo.pending_commit().merge_type():
+                case c if c == "cherry_pick":
+                    self.write_cherry_pick_commit()
+                case c if c == "revert":
+                    self.write_revert_commit()
 
             self.sequencer.load()
             self.sequencer.drop_command()

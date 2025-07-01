@@ -80,7 +80,7 @@ class ConfigFile:
     def save(self):
         for section, lines in self.lines.items():
             for line in lines:
-                self.lockfile.write(line.text)
+                self.lockfile.write(line.text.encode('utf-8'))
         self.lockfile.commit()
         
     def list(self):
@@ -109,6 +109,9 @@ class ConfigFile:
         self.add_variable(section, key, var, value)
 
     def set(self, key, value):
+        if value is None:
+            return
+
         key, var = self.split_key(key)
         section, lines = self.find_lines(key, var)
 

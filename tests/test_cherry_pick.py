@@ -289,3 +289,86 @@ class TestCherryPick:
 
             def test_removes_the_merge_state(self, repo):
                 assert not repo.pending_commit().is_in_progress()
+
+    class TestWithMerges:
+        @pytest.fixture(autouse=True)
+        def setup_merges(self, legit_cmd, commit, write_file):
+            self.time = datetime.now().astimezone()
+
+            def commit_tree(message, files):
+                self.time += timedelta(seconds=10)
+                for path, contents in files.items():
+                    write_file(path, contents)
+                legit_cmd("add", ".")
+                commit(message, when=self.time)
+
+            for message in ["one", "two", "three", "four"]:
+                commit_tree(message, {"f.txt": message})
+
+            legit_cmd("branch", "topic", "@~2")
+            legit_cmd("checkout", "topic")
+            commit_tree("five", {"g.txt": "five"})
+            commit_tree("six", {"h.txt": "six"})
+
+            legit_cmd("branch", "side", "@^")
+            legit_cmd("checkout", "side")
+            commit_tree("seven", {"j.txt": "seven"})
+            commit_tree("eight", {"j.txt": "eight"})
+            commit_tree("nine", {"f.txt": "nine"})
+
+            legit_cmd("checkout", "topic")
+            legit_cmd("merge", "side^", "-m", "merge side^")
+            legit_cmd("merge", "side", "-m", "merge side")
+
+            legit_cmd("checkout", "master")
+
+        def test_refuses_to_cherry_pick_a_merge_without_specifying_a_parent(self, legit_cmd, resolve_revision):
+            cmd, _, _, stderr = legit_cmd("cherry-pick", "topic")
+            assert_status(cmd, 1)
+
+            oid = resolve_revision("topic")
+
+            expected_error = f"error: commit {oid} is a merge but no -m option was given\n"
+            assert_stderr(stderr, expected_error)
+
+        def test_refuses_to_cherry_pick_a_non_merge_commit_with_mainline(self, legit_cmd, resolve_revision):
+            cmd, _, _, stderr = legit_cmd("cherry-pick", "-m", "1", "side")
+            assert_status(cmd, 1)
+
+            oid = resolve_revision("side")
+
+            expected_error = f"error: mainline was specified but commit {oid} is not a merge\n"
+            assert_stderr(stderr, expected_error)
+
+        def test_cherry_picks_a_merge_based_on_its_first_parent(self, repo, repo_path, legit_cmd):
+            cmd, _, _, _ = legit_cmd("cherry-pick", "-m", "1", "topic^")
+            assert_status(cmd, 0)
+
+            assert_index(repo, ("f.txt", 0), ("j.txt", 0))
+            assert_workspace(repo_path, {"f.txt": "four", "j.txt": "eight"})
+
+        def test_cherry_picks_a_merge_based_on_its_second_parent(self, repo, repo_path, legit_cmd):
+            cmd, _, _, _ = legit_cmd("cherry-pick", "-m", "2", "topic^")
+            assert_status(cmd, 0)
+
+            assert_index(repo, ("f.txt", 0), ("h.txt", 0))
+            assert_workspace(repo_path, {"f.txt": "four", "h.txt": "six"})
+
+        def test_resumes_cherry_picking_merges_after_a_conflict(self, repo, repo_path, legit_cmd, write_file):
+            cmd, _, _, _ = legit_cmd("cherry-pick", "-m", "1", "topic", "topic^")
+            assert_status(cmd, 1)
+
+            cmd, _, stdout, _ = legit_cmd("status", "--porcelain")
+            assert_stdout(stdout, "UU f.txt\n")
+
+            write_file("f.txt", "resolved")
+            legit_cmd("add", "f.txt")
+            cmd, _, _, _ = legit_cmd("cherry-pick", "--continue")
+            assert_status(cmd, 0)
+
+            revs = list(RevList(repo, ["@~3.."]).each())
+            
+            assert [c.message.strip() for c in revs] == ["merge side^", "merge side", "four"]
+            assert_index(repo, ("f.txt", 0), ("j.txt", 0))
+            assert_workspace(repo_path, {"f.txt": "resolved", "j.txt": "eight"})
+
