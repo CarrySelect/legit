@@ -18,6 +18,7 @@ from legit.cmd_merge import Merge
 from legit.cmd_rm import Rm
 from legit.cmd_reset import Reset
 from legit.cmd_cherry_pick import CherryPick
+from legit.cmd_revert import Revert
 
 
 class Command:
@@ -37,6 +38,7 @@ class Command:
         "rm": Rm,
         "reset": Reset,
         "cherry-pick": CherryPick,
+        "revert": Revert,
     }
 
     @staticmethod

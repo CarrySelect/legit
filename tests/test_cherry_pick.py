@@ -4,7 +4,7 @@ from pathlib import Path
 import textwrap
 
 from legit.rev_list import RevList
-from tests.conftest import assert_stdout, assert_stderr, assert_status, legit_cmd
+from tests.conftest import assert_stdout, assert_stderr, assert_status
 from legit.editor import Editor
 
 

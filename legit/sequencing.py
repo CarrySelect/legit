@@ -1,5 +1,8 @@
 import textwrap
 from legit.commit import Commit
+from legit.repository import Repository, Sequencer, PendingCommit
+from legit.resolve import Resolve
+from legit.editor import Editor
 
 
 CONFLICT_NOTES = textwrap.dedent(
@@ -86,9 +89,11 @@ class SequencingMixin:
 
     def resume_sequencer(self) -> None:
         while True:
-            action, commit = self.sequencer.next_command()
-            if commit is None:
+            
+            cmd = self.sequencer.next_command()
+            if cmd is None:
                 break
+            action, commit = cmd
             if action == "revert":
                 self.revert(commit)
             elif action == "pick":
@@ -101,11 +106,12 @@ class SequencingMixin:
     def handle_abort(self) -> None:
         if self.repo.pending_commit().is_in_progress():
             self.repo.pending_commit().clear(self.merge_type())
+
         self.repo.index.load_for_update()
 
         try:
             self.sequencer.abort()
-        except Exception as e:
+        except ValueError as e:
             self.stderr.write(f"warning: {e}\n")
 
         self.repo.index.write_updates()

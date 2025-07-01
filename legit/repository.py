@@ -192,7 +192,7 @@ class Sequencer:
     def abort(self) -> None:
         head_oid = self.head_path.read_text().strip()
         expected = self.abort_path.read_text().strip()
-        actual = self.repo.refs.read_head().strip()
+        actual = self.repo.refs.read_head()
 
         self.quit()
 

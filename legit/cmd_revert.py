@@ -7,6 +7,7 @@ from legit.rev_list import RevList
 from legit.inputs import CherryPick as CherryPickInput
 from legit.editor import Editor
 
+
 COMMIT_NOTES = textwrap.dedent(
     """\
     Please enter the commit message for your changes. Lines starting
@@ -56,7 +57,7 @@ class Revert(SequencingMixin, WriteCommitMixin, Base):
     def revert_commit_message(self, commit: Commit) -> str:
         return textwrap.dedent(
             f"""\
-            Revert {commit.title_line().strip()}
+            Revert "{commit.title_line().strip()}"
 
             This reverts commit {commit.oid}.
             """
