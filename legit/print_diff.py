@@ -4,6 +4,15 @@ from legit.hunk import Hunk
 from legit.myers import Edit
 
 
+DIFF_FORMATS: dict[str, str] = {
+    "context": "normal",
+    "meta": "bold",
+    "frag": "cyan",
+    "old": "red",
+    "new": "green"
+}
+
+
 class Target:
     NULL_PATH = "/dev/null"
 
@@ -18,6 +27,17 @@ class Target:
 
 
 class PrintDiffMixin:
+    def diff_fmt(self, name, text):
+        key = ["color", "diff", name]
+        style_str = self.repo.config.get(key)
+        
+        if style_str:
+            style = style_str.split()
+        else:
+            style = DIFF_FORMATS.get(name)
+        
+        return self.fmt(style, text)
+
     def define_print_diff_options(self) -> None:
         if any(x in self.args for x in ("-p", "-u", "--patch")):
             self.patch = True
@@ -83,7 +103,7 @@ class PrintDiffMixin:
             self.print_diff_hunk(hunk)
 
     def print_diff_hunk(self, hunk: Hunk) -> None:
-        self.println(self.fmt("cyan", hunk.header()))
+        self.println(self.fmt("frag", hunk.header()))
         for edit in hunk.edits:
             self.print_diff_edit(edit)
 
@@ -92,17 +112,17 @@ class PrintDiffMixin:
 
         match edit.ty:
             case c if c == "eql":
-                self.println(text)
+                self.println(self.diff_fmt("context", text))
             case c if c == "ins":
-                self.println(self.fmt("green", text))
+                self.println(self.diff_fmt("new", text))
             case c if c == "del":
-                self.println(self.fmt("red", text))
+                self.println(self.diff_fmt("old", text))
 
     def _short(self, oid: str) -> str:
         return self.repo.database.short_oid(oid)
 
     def _header(self, string: str) -> None:
-        self.println(self.fmt("bold", string))
+        self.println(self.diff_fmt("meta", string))
 
 
 

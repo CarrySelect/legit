@@ -13,6 +13,8 @@ from legit.workspace import Workspace
 from legit.status import Status
 from legit.migration import Migration
 from legit.lockfile import Lockfile
+from legit.config_stack import ConfigStack
+from legit.config import ConfigFile
 
 
 UNSAFE_MESSAGE = "You seem to have moved HEAD. Not rewinding, check your HEAD!"
@@ -25,6 +27,7 @@ class Repository:
         self.index: Index = Index(git_path / "index")
         self.refs: Refs = Refs(git_path)
         self.workspace: Workspace = Workspace(git_path.parent)
+        self.config: ConfigStack = ConfigStack(self.git_path)
 
     def status(self, commit_oid: Optional[str] = None) -> Status:
         return Status(self, commit_oid)
@@ -125,15 +128,25 @@ class Sequencer:
         self.abort_path = self.path / "aborty-safety"
         self.head_path = self.path / "head"
         self.commands = []
+        self.config: ConfigFile = ConfigFile(self.path / "opts")
 
-    def start(self) -> None:
+    def start(self, options) -> None:
         self.path.mkdir(parents=True, exist_ok=False)
+
+        self.config.open_for_update()
+        for k, v in options.items():
+            self.config.set(["options", key], value)
+        self.config.save()
 
         head_oid = self.repo.refs.read_head()
         self.write_file(self.head_path, head_oid)
         self.write_file(self.abort_path, head_oid)
 
         self.open_todo_file()
+
+    def get_option(self, name: str) -> str:
+        self.config.open()
+        return self.config.get(["options", name])
 
     def write_file(self, path: Path, data: str) -> None:
         lockfile = Lockfile(path)

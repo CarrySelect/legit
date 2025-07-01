@@ -34,6 +34,7 @@ class CherryPick(WriteCommitMixin, SequencingMixin, Base):
 
     def pick_merge_inputs(self, commit: Commit) -> None:
         short = self.repo.database.short_oid(commit.oid)
+        parent = self.select_parent(commit)
 
         left_name = "HEAD"
         left_oid = self.repo.refs.read_head()
@@ -41,6 +42,6 @@ class CherryPick(WriteCommitMixin, SequencingMixin, Base):
         right_name = f"{short}... {commit.title_line().strip()}"
         right_oid = commit.oid
 
-        return CherryPickInput(left_name, right_name, left_oid, right_oid, [commit.parent])
+        return CherryPickInput(left_name, right_name, left_oid, right_oid, [parent])
 
 

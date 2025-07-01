@@ -3,6 +3,7 @@ from typing import MutableMapping, TextIO
 from legit.cmd_color import Color
 from legit.pager import Pager
 from legit.editor import Editor
+from legit.repository import Repository
 
 
 class Base:
@@ -24,6 +25,7 @@ class Base:
         self.status: int | None = None
         self.isatty: bool = stdout.isatty()
         self.pager: Pager | None = None
+        self.repo: Repository = Repository(self.dir / ".git")
 
     def edit_file(self, path: Path):
         editor = Editor.edit(path, self.editor_command())
@@ -32,10 +34,11 @@ class Base:
             editor.close()
 
     def editor_command(self) -> str:
+        core_editor = self.repo.config.get(["core", "editor"])
         git_editor = self.env.get("GIT_EDITOR")
         visual = self.env.get("VISUAL")
         editor = self.env.get("EDITOR")
-        return git_editor or visual or editor
+        return git_editor or core_editor or visual or editor
 
     def setup_pager(self) -> None:
         if self.pager is not None:

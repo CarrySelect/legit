@@ -17,13 +17,26 @@ CONFLICT_NOTES = textwrap.dedent(
 class SequencingMixin:
     def define_options(self) -> None:
         self.define_write_commit_options()
+        
         self.mode = "run"
-        if "--continue" in self.args:
-            self.mode = "continue"
-        elif "--abort" in self.args:
-            self.mode = "abort"
-        elif "--quit" in self.args:
-            self.mode = "quit"
+
+        args_iter = iter(self.args)
+        for arg in args_iter:
+            if arg.startswith('--mainline='):
+                self.mainline = arg.split('=', 1)[1]
+            elif arg == '-m':
+                try:
+                    self.mainline = next(args_iter)
+                except StopIteration:
+                    pass
+
+            elif arg == "--continue":
+                self.mode = "continue"
+            elif arg == "--abort":
+                self.mode = "abort"
+            elif arg == "--quit":
+                self.mode = "quit"
+        
 
     def run(self) -> None:
         self.repo: Repository = Repository(self.dir / ".git")
@@ -38,9 +51,25 @@ class SequencingMixin:
         elif self.mode == "quit":
             self.handle_quit()
 
-        self.sequencer.start()
+        self.sequencer.start({"mainline": self.mainline})
         self.store_commit_sequence()
         self.resume_sequencer()
+
+    def select_parent(self, commit: Commit):
+        mainline = self.sequencer.get_option("mainline")
+
+        if commit.is_merge():
+            if mainline:
+                return commit.parents[mainline - 1]
+
+            self.stderr.write(f"error: commit {commit.oid} is a merge but no -m option was given")
+            self.exit(1)
+        else:
+            if not mainline:
+                return commit.parent
+
+            self.stderr.write(f"error: mainline was specified but commit {commit.oid} is not a merge")
+            self.exit(1)
 
     def resolve_merge(self, inputs) -> None:
         self.repo.index.load_for_update()

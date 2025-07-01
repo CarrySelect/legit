@@ -41,8 +41,11 @@ CHERRY_PICK_NOTES = textwrap.dedent(
 
 class WriteCommitMixin:
     def current_author(self) -> Author:
-        name  = self.env.get("GIT_AUTHOR_NAME",  "A. U. Thor")
-        email = self.env.get("GIT_AUTHOR_EMAIL", "author@example.com")
+        config_name = self.repo.config.get(["user", "name"])
+        config_email = self.repo.config.get(["user", "email"])
+
+        name  = self.env.get("GIT_AUTHOR_NAME", config_name)
+        email = self.env.get("GIT_AUTHOR_EMAIL", config_email)
 
         return Author(name, email, datetime.now().astimezone())
 

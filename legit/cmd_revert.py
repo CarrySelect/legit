@@ -48,7 +48,7 @@ class Revert(SequencingMixin, WriteCommitMixin, Base):
         left_oid = self.repo.refs.read_head()
 
         right_name = f"parent of {short}... {commit.title_line().strip()}"
-        right_oid = commit.parent
+        right_oid = self.select_parent(commit)
 
         return CherryPickInput(left_name, right_name, 
                                left_oid, right_oid,
@@ -56,7 +56,7 @@ class Revert(SequencingMixin, WriteCommitMixin, Base):
 
     def revert_commit_message(self, commit: Commit) -> str:
         return textwrap.dedent(
-            f"""\
+                f"""\
             Revert "{commit.title_line().strip()}"
 
             This reverts commit {commit.oid}.
