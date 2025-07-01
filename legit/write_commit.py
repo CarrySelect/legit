@@ -130,7 +130,7 @@ class WriteCommitMixin:
 
     def write_merge_commit(self) -> None:
         self.handle_conflicted_index()
-        parents = [self.repo.refs.read_head(), self.repo.pending_commit().merge_oid]
+        parents = [self.repo.refs.read_head(), self.repo.pending_commit().merge_oid()]
         message = self.compose_merge_message(MERGE_NOTES)
         self.write_commit(parents, message)
         self.repo.pending_commit().clear("merge")
@@ -144,7 +144,7 @@ class WriteCommitMixin:
         pick_oid = self.repo.pending_commit().merge_oid("cherry_pick")
         commit = self.repo.database.load(pick_oid)
 
-        picked = CommitObject(parents, self.write_tree().oid, commit.author, self.current_author(), message)
+        picked = CommitObject(self.parents, self.write_tree().oid, commit.author, self.current_author(), message)
 
         self.repo.database.store(picked)
         self.repo.refs.update_head(picked.oid)

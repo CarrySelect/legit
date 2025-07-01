@@ -78,7 +78,6 @@ class PendingCommit:
         self.path = path
         self.message_path = path / "MERGE_MSG"
     
-    @property
     def merge_oid(self, ty: str = "merge"):
         head_path = self.path / PendingCommit.HEAD_FILES[ty]
         try:
@@ -93,7 +92,7 @@ class PendingCommit:
     
     def start(self, oid: str, ty: str = "merge") -> None:
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-        with os.fdopen(os.open(PendingCommit.HEAD_FILES[ty], flags, 0o644), "w") as f:
+        with os.fdopen(os.open(self.path / PendingCommit.HEAD_FILES[ty], flags, 0o644), "w") as f:
             f.write(oid)
 
     def clear(self, ty: str = "merge") -> None:

@@ -10,6 +10,7 @@ class Resolve:
     def __init__(self, repo: Repository, inputs: Inputs) -> None:
         self.repo: Repository = repo
         self.inputs: Inputs = inputs
+        self._on_progress = lambda message: None
 
     def execute(self) -> None:
         self.prepare_tree_diffs()
@@ -19,10 +20,10 @@ class Resolve:
         self.write_untracked_files()
 
     def on_progress(self, block):
-        self.on_progress = block
+        self._on_progress = block
 
     def log(self, message: str) -> None:
-        self.on_progress(message)
+        self._on_progress(message)
 
     def write_untracked_files(self) -> None:
         for path, item in self.untracked.items():

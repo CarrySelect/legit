@@ -23,6 +23,8 @@ class CherryPick(WriteCommitMixin, Base):
     def run(self) -> None:
         self.repo: Repository = Repository(self.dir / ".git")
         self.sequencer: Sequencer = Sequencer(self.repo)
+        
+        self.define_options()
 
         if self.mode == "continue":
             self.handle_continue()
@@ -34,6 +36,9 @@ class CherryPick(WriteCommitMixin, Base):
         self.sequencer.start()
         self.store_commit_sequence()
         self.resume_sequencer()
+
+    def merge_type(self) -> str:
+        return "cherry_pick"
 
     def handle_abort(self) -> None:
         if self.repo.pending_commit().is_in_progress():
@@ -56,7 +61,7 @@ class CherryPick(WriteCommitMixin, Base):
         self.exit(0)
 
     def store_commit_sequence(self) -> None:
-        commits = RevList(self.repo, self.args.reverse(), {"walk": False})
+        commits = RevList(self.repo, list(reversed(self.args)), {"walk": False})
         for commit in reversed(list(commits.each())):
             self.sequencer.pick(commit)
 
@@ -72,6 +77,7 @@ class CherryPick(WriteCommitMixin, Base):
         self.exit(0)
     
     def define_options(self) -> None:
+        self.define_write_commit_options()
         self.mode = "run"
         if "--continue" in self.args:
             self.mode = "continue"
@@ -113,7 +119,7 @@ class CherryPick(WriteCommitMixin, Base):
         right_name = f"{short}... {commit.title_line().strip()}"
         right_oid = commit.oid
 
-        return CherryPickInput(left_name, right_name, left_name, right_oid, [commit.parent])
+        return CherryPickInput(left_name, right_name, left_oid, right_oid, [commit.parent])
 
     def resolve_merge(self, inputs) -> None:
         self.repo.index.load_for_update()
