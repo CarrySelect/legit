@@ -94,8 +94,48 @@ class StatusCmd(Base):
         else:
             self.print_long_format()
 
+    def print_pending_commit_status(self) -> None:
+        match self.repo.pending_commit().merge_type():
+            case c if c == "merge":
+                if not self.status_state.conflicts:
+                    self.println("All conflicts fixed but you are still merging.")
+                    self.hint("use 'legit commit' to conclude merge")
+                else:
+                    self.println("You have unmerged paths.")
+                    self.hint("fix conflicts and run 'legit commit'")
+                    self.hint("use 'legit merge --abort' to abort the merge")
+                self.println("")
+            case c if c == "cherry_pick":
+                self.print_pending_type("cherry_pick")
+            case c if c == "revert":
+                self.print_pending_type("revert")
+
+    def print_pending_type(self, ty: str) -> None:
+        oid = self.repo.pending_commit().merge_oid(ty)
+        short = self.repo.database.short_oid(oid)
+
+        op = ty.replace("_", "-")
+
+        self.println(f"You are currently {op}ing commit {short}.")
+
+        if not self.status_state.conflicts:
+            self.hint(f"all conflicts fixed: run 'legit {op} --continue'")
+        else:
+            self.hint(f"fix conflicts and run 'legit {op} --continue")
+
+        self.hint(f"use 'legit {op} --abort' to cancel the {op} operation")
+
+        self.println("")
+
+    def hint(self, msg: str) -> None:
+        self.println(f"  ({msg})")
+
     def print_long_format(self) -> None:
         assert self.status_state is not None
+    
+        self.print_branch_status()
+        self.print_pending_commit_status()
+
         self.print_changes("Changes to be committed", self.status_state.index_changes, 'green')
         self.print_changes("Unmerged paths", self.status_state.conflicts, "red", "conflict") 
         self.print_changes("Changes not staged for commit", self.status_state.workspace_changes, 'red')

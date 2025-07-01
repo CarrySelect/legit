@@ -72,6 +72,7 @@ class PendingCommit:
     HEAD_FILES = {
         "merge": "MERGE_HEAD",
         "cherry_pick": "CHERRY_PICK_HEAD",
+        "revert": "REVERT_HEAD",
     }
 
     def __init__(self, path: Path) -> None:
@@ -141,7 +142,10 @@ class Sequencer:
         lockfile.commit()
 
     def pick(self, commit: Commit) -> None:
-        self.commands.append(commit)
+        self.commands.append(("pick", commit))
+
+    def revert(self, commit: Commit) -> None:
+        self.commands.append(("revert", commit))
 
     def next_command(self):
         try:
@@ -164,9 +168,9 @@ class Sequencer:
         if self.todo_file is None:
             return
 
-        for commit in self.commands:
+        for action, commit in self.commands:
             short = self.repo.database.short_oid(commit.oid)
-            self.todo_file.write(f"pick {short} {commit.title_line()}\n".encode('utf-8'))
+            self.todo_file.write(f"{action} {short} {commit.title_line()}\n".encode('utf-8'))
         
         self.todo_file.commit()
 
@@ -176,9 +180,10 @@ class Sequencer:
             return
     
         for line in self.todo_path.read_text().splitlines():
-            oid, _rest = re.compile(r"^pick (\S+) (.*)$").match(line).groups()
+            action, oid, _rest = re.compile(r"^(\S+) (\S+) (.*)$").match(line).groups()
             oids = self.repo.database.prefix_match(oid)
-            self.commands.append(self.repo.database.load(oids[0]))
+            commit = self.repo.database.load(oids[0])
+            self.commands.append((action, commit))
 
     def quit(self) -> None:
         import shutil

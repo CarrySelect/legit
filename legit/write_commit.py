@@ -125,6 +125,8 @@ class WriteCommitMixin:
             self.write_merge_commit()
         elif ty == "cherry_pick":
             self.write_cherry_pick_commit()
+        elif ty == "revert":
+            self.write_revert_commit()
 
         self.exit(0)
 
@@ -150,6 +152,15 @@ class WriteCommitMixin:
         self.repo.refs.update_head(picked.oid)
 
         self.repo.pending_commit().clear("cherry_pick")
+
+    def write_revert_commit(self) -> None:
+        self.handle_conflicted_index()
+
+        parents = [self.repo.refs.read_head()]
+        message = self.compose_merge_message()
+        self.write_commit(parents, message)
+
+        self.repo.pending_commit().clear("revert")
 
     def handle_conflicted_index(self) -> None:
         if not self.repo.index.is_conflict():
