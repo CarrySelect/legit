@@ -5,11 +5,11 @@ from legit.pack import InvalidPack
 
 
 class Stream:
-    def __init__(self, f):
+    def __init__(self, f, buffer=''):
         self.input = f
         self.digest = hashlib.sha1()
         self.offset = 0
-        self.buffer = bytearray()
+        self.buffer = bytearray() + bytes(buffer, 'utf-8')
         self._capture = None
 
     @contextmanager

@@ -37,6 +37,10 @@ class Database:
         self.path: Path = path
         self.objects: MutableMapping[str, Blob | Commit | Tree] = {}
 
+    def has(self, oid: str) -> bool:
+        object_path = self.path / str(oid[:2]) / str(oid[2:])
+        return object_path.exists()
+
     def load_raw(self, oid):
         """
         Load a raw Git object by its oid, returning a Raw(type, size, data) instance.
