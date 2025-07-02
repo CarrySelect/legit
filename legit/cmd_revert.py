@@ -63,14 +63,12 @@ class Revert(SequencingMixin, WriteCommitMixin, Base):
             """
         )
 
-    def edit_revert_message(self, message: str) -> str:
-        def editor_setup(editor: Editor):
+    def edit_revert_message(self, message: str):
+        def _setup(editor: Editor) -> None:
             editor.println(message)
             editor.println("")
             editor.note(COMMIT_NOTES)
-    
-        return Editor.edit(self.commit_message_path(), block=editor_setup)
 
-
+        return Editor.edit(self.commit_message_path(), block=_setup)
 
 

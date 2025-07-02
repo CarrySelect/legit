@@ -135,7 +135,8 @@ class Sequencer:
 
         self.config.open_for_update()
         for k, v in options.items():
-            self.config.set(["options", k], v)
+            if v is not None:
+                self.config.set(["options", k], v)
         self.config.save()
 
         head_oid = self.repo.refs.read_head()

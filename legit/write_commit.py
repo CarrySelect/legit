@@ -61,7 +61,7 @@ class WriteCommitMixin:
     def define_write_commit_options(self):
         self.message = None
         self.file = None
-        self.edit = 'auto'
+        self.edit = False
     
         args_iter = iter(self.args)
         for arg in args_iter:
@@ -72,8 +72,6 @@ class WriteCommitMixin:
     
             elif arg.startswith('--message='):
                 self.message = arg.split('=', 1)[1]
-                if self.edit == 'auto': 
-                    self.edit = False
             elif arg == '-m':
                 try:
                     self.message = next(args_iter)
@@ -85,14 +83,10 @@ class WriteCommitMixin:
             elif arg.startswith('--file='):
                 file_path = arg.split('=', 1)[1]
                 self.file = self.expanded_path(file_path)
-                if self.edit == 'auto':
-                    self.edit = False
             elif arg == '-F':
                 try:
                     file_path = next(args_iter)
                     self.file = self.expanded_path(file_path)
-                    if self.edit == 'auto':
-                        self.edit = False
                 except StopIteration:
                     pass
 
@@ -143,13 +137,13 @@ class WriteCommitMixin:
     def write_cherry_pick_commit(self) -> None:
         self.handle_conflicted_index()
 
-        self.parents = [self.repo.refs.read_head()]
+        parents = [self.repo.refs.read_head()]
         message = self.compose_merge_message(CHERRY_PICK_NOTES)
 
         pick_oid = self.repo.pending_commit().merge_oid("cherry_pick")
         commit = self.repo.database.load(pick_oid)
 
-        picked = CommitObject(self.parents, self.write_tree().oid, commit.author, self.current_author(), message)
+        picked = CommitObject(parents, self.write_tree().oid, commit.author, self.current_author(), message)
 
         self.repo.database.store(picked)
         self.repo.refs.update_head(picked.oid)

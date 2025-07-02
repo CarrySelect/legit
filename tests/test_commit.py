@@ -118,3 +118,21 @@ class TestAmendingCommits:
         paths = sorted(str(p) for p in diff.keys())
         assert paths == ["another.txt", "file.txt"]
 
+class TestConfiguringAnAuthor:
+    @pytest.fixture(autouse=True)
+    def setup(self, legit_cmd):
+        legit_cmd("config", "user.name", "A. N. User")
+        legit_cmd("config", "user.email", "user@example.com")
+
+    def test_it_uses_the_author_information_from_the_config(self, write_file, legit_cmd, commit, load_commit):
+        write_file("file.txt", "1")
+        legit_cmd("add", ".")
+        commit("first", None, False)
+
+        head = load_commit("@")
+
+        assert "A. N. User" == head.author.name
+        assert "user@example.com" == head.author.email
+
+
+

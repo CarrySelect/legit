@@ -71,6 +71,8 @@ class SequencingMixin:
     def select_parent(self, commit: Commit):
         mainline = self.sequencer.get_option("mainline")
 
+        print(f"{mainline=}")
+
         if commit.is_merge():
             if mainline:
                 return commit.parents[mainline - 1]
@@ -106,6 +108,8 @@ class SequencingMixin:
         self.stderr.write(f"error: could not apply {inputs.right_name}\n")
         for line in CONFLICT_NOTES.splitlines():
             self.stderr.write(f"hint: {line}\n")
+        
+        self.println(f"exiting with 1111111111111")
         self.exit(1)
 
     def finish_commit(self, commit: Commit) -> None:

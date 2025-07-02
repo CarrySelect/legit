@@ -57,12 +57,15 @@ def repo(repo_path):
 
 @pytest.fixture
 def commit(legit_cmd):
-    def _commit(message: str, when: Optional[datetime] = None):
-        env = {
-            "GIT_AUTHOR_NAME": "A. U. Thor",
-            "GIT_AUTHOR_EMAIL": "author@example.com",
-        }
-
+    def _commit(message: str, when: Optional[datetime] = None, author: bool = True):
+        if author:
+            env = {
+                "GIT_AUTHOR_NAME": "A. U. Thor",
+                "GIT_AUTHOR_EMAIL": "author@example.com",
+            }
+        else:
+            env = {}
+    
         if when is None:
             when = datetime.now()
     

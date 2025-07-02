@@ -220,7 +220,7 @@ class TestRevert:
         assert_index(repo, {"f.txt": "four"})
         assert_workspace(repo_path, {"f.txt": "four"})
 
-    def test_can_continue_after_committing_the_resolved_tree(self, legit_cmd, write_file, repo, repo_path, stub_editor):
+    def test_can_continue_after_committing_the_resolved_tree(self, legit_cmd, write_file, repo, repo_path):
         legit_cmd("revert", "@~4..@^")
 
         write_file("g.txt", "five")
