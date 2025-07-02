@@ -61,11 +61,16 @@ class Refs:
 
     HEAD = "HEAD"
     SYMREF = re.compile(r"^ref: (.+)$")
+    
+    REFS_DIR = Path("refs")
+    HEADS_DIR = REFS_DIR / "heads"
+    REMOTES_DIR = REFS_DIR / "remotes"
 
     def __init__(self, path: Path) -> None:
         self.path: Path = path
-        self.refs_path: Path = self.path / "refs"
-        self.heads_path: Path = self.refs_path / "heads"
+        self.refs_path: Path = self.path / self.REFS_DIR
+        self.heads_path: Path = self.path / self.HEADS_DIR
+        self.remotes_path: Path = self.path / self.REMOTES_DIR
 
     def reverse_refs(self) -> dict[str, list['Refs.Ref | Refs.SymRef']]:
         table: dict[str, list['Refs.Ref | Refs.SymRef']] = defaultdict(list)
@@ -80,19 +85,20 @@ class Refs:
     def list_all_refs(self):
         return [Refs.SymRef(self, Refs.HEAD)] + self.list_refs(self.refs_path)
 
-    def short_name(self, p: str) -> str:
-        path = self.path / p
-
+    def short_name(self, path: str) -> str:
+        full_path = self.path / path
+        
         prefix = None
-        for candidate in (self.heads_path, self.path):
-           if any(parent == candidate for parent in (path.parent, *path.parent.parents)):
-                prefix = candidate
+        
+        for base_dir in [self.remotes_path, self.heads_path, self.path]:
+            if full_path.is_relative_to(base_dir):
+                prefix = base_dir
                 break
-
+        
         if prefix is None:
-            prefix = self.path
+            raise ValueError("Path is not within any known prefix directory.")
 
-        return str(path.relative_to(prefix))
+        return str(full_path.relative_to(prefix))
 
     def list_branches(self) -> list['Refs.SymRef']:
         return self.list_refs(self.heads_path)
@@ -204,7 +210,7 @@ class Refs:
         return self.read_symref(path) if path is not None else None
 
     def path_for_name(self, name: str) -> Optional[Path]:
-        prefixes = (self.path, self.refs_path, self.heads_path)
+        prefixes = (self.path, self.refs_path, self.heads_path, self.remotes_path)
         for prefix in prefixes:
             candidate = prefix / name
             if candidate.is_file():

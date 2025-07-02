@@ -256,6 +256,81 @@ def rm(recursive: bool, cached: bool, force: bool, paths: tuple[str, ...]) -> No
     cmd_args.extend(paths)
     run_cmd(*cmd_args)
 
+@cli.command(
+    name="config",
+    context_settings={"ignore_unknown_options": True, "allow_interspersed_args": False},
+)
+@click.option("--local", "file_scope", flag_value="local", help="Use local repository config file.")
+@click.option("--global", "file_scope", flag_value="global", help="Use global user config file.")
+@click.option("--system", "file_scope", flag_value="system", help="Use system-wide config file.")
+@click.option("-f", "--file", "file_scope", type=click.Path(), help="Use given config file.")
+@click.option("--add", is_flag=True, help="Add a new line to the option, without altering existing values.")
+@click.option("--replace-all", is_flag=True, help="Replace all lines matching the key, not just the last one.")
+@click.option("--get-all", is_flag=True, help="Get all values for a multi-valued key.")
+@click.option("--unset", is_flag=True, help="Remove the line matching the key.")
+@click.option("--unset-all", is_flag=True, help="Remove all lines matching the key.")
+@click.option("--remove-section", is_flag=True, help="Remove the entire section.")
+@click.argument("args", nargs=-1, type=click.UNPROCESSED)
+def config(file_scope, add, replace_all, get_all, unset, unset_all, remove_section, args):
+    """Get and set repository or global options."""
+    
+    cmd_args = []
+
+    # Handle file scope options
+    if file_scope:
+        if file_scope in ["local", "global", "system"]:
+            cmd_args.append(f"--{file_scope}")
+        else:
+            cmd_args.extend(["--file", file_scope])
+
+    # Handle action flags
+    action_flags = {
+        "--add": add,
+        "--replace-all": replace_all,
+        "--get-all": get_all,
+        "--unset": unset,
+        "--unset-all": unset_all,
+        "--remove-section": remove_section,
+    }
+
+    # Add the action flag that was used (if any) to the arguments
+    for flag, is_set in action_flags.items():
+        if is_set:
+            cmd_args.append(flag)
+            break # Assume only one action flag can be used at a time
+
+    # Add the remaining positional arguments (key, value, etc.)
+    cmd_args.extend(args)
+    
+    run_cmd("config", *cmd_args)
+
+@cli.command()
+@click.option('-v', '--verbose', is_flag=True, help='Be more verbose and show remote URLs.')
+@click.argument("args", nargs=-1)
+def remote(verbose: bool, args: tuple[str, ...]) -> None:
+    """
+    Manage the set of tracked repositories.
+    
+    Subcommands:
+        add <name> <url>      Adds a remote
+        remove <name>         Removes a remote
+    """
+    cmd_args = []
+    
+    # The first positional argument is the subcommand (e.g., 'add')
+    subcommand = args[0] if args else None
+    
+    # Pass along any top-level flags like --verbose
+    if verbose:
+        cmd_args.append('--verbose')
+
+    if subcommand:
+        cmd_args.append(subcommand)
+        # Pass the rest of the arguments (e.g., the name and url)
+        cmd_args.extend(args[1:])
+        
+    run_cmd("remote", *cmd_args)
+
 
 if __name__ == '__main__':
     cli()

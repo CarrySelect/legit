@@ -135,7 +135,6 @@ class ConfigFile:
         self.remove_all(section, lines)
         self.add_variable(section, key, var, value)
 
-
     def unset(
         self,
         key: Sequence[str],
@@ -178,8 +177,12 @@ class ConfigFile:
         return self.lines.pop(norm, None) is not None
 
     def subsections(self, name: str) -> List[str]:
-        main, _ = Section.normalize([name])
-        return [sub for (m, sub) in self.lines.items() if m == name and sub]
+        name, _ = Section.normalize([name])
+        sections = []
+        for main, sub in self.lines.keys():
+            if main == name and sub != "":
+                sections.append(sub)
+        return sections
 
     def section_exists(self, key: Sequence[str]) -> bool:
         return Section.normalize(key) in self.lines

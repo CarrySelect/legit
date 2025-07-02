@@ -71,8 +71,6 @@ class SequencingMixin:
     def select_parent(self, commit: Commit):
         mainline = self.sequencer.get_option("mainline")
 
-        print(f"{mainline=}")
-
         if commit.is_merge():
             if mainline:
                 return commit.parents[mainline - 1]

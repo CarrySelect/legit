@@ -20,6 +20,7 @@ from legit.cmd_reset import Reset
 from legit.cmd_cherry_pick import CherryPick
 from legit.cmd_revert import Revert
 from legit.cmd_config import Config
+from legit.cmd_remote import Remote
 
 
 class Command:
@@ -41,6 +42,7 @@ class Command:
         "cherry-pick": CherryPick,
         "revert": Revert,
         "config": Config,
+        "remote": Remote,
     }
 
     @staticmethod
@@ -55,8 +57,6 @@ class Command:
         name = argv[1]
         args = argv[2:]
         
-        print(name)
-    
         if name not in Command.COMMANDS:
             raise Command.Unknown(f"{name} is not a legit command")
         

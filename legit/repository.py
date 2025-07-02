@@ -15,6 +15,7 @@ from legit.migration import Migration
 from legit.lockfile import Lockfile
 from legit.config_stack import ConfigStack
 from legit.config import ConfigFile
+from legit.remotes import Remotes
 
 
 UNSAFE_MESSAGE = "You seem to have moved HEAD. Not rewinding, check your HEAD!"
@@ -28,6 +29,7 @@ class Repository:
         self.refs: Refs = Refs(git_path)
         self.workspace: Workspace = Workspace(git_path.parent)
         self.config: ConfigStack = ConfigStack(self.git_path)
+        self.remotes: Remotes = Remotes(self.config.file("local"))
 
     def status(self, commit_oid: Optional[str] = None) -> Status:
         return Status(self, commit_oid)
