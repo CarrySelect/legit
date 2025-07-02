@@ -332,5 +332,35 @@ def remote(verbose: bool, args: tuple[str, ...]) -> None:
     run_cmd("remote", *cmd_args)
 
 
+@cli.command()
+@click.option(
+    "-f", "--force",
+    is_flag=True,
+    help="Force update of local refs (pass --force to the fetch command).",
+)
+@click.option(
+    "--upload-pack",
+    "upload_pack",
+    metavar="<path>",
+    help="Specify the path to the remote upload-pack program.",
+)
+@click.argument("refs", nargs=-1)
+def fetch(force: bool, upload_pack: str | None, refs: tuple[str, ...]) -> None:
+    """
+    Download objects and refs from another repository.
+    """
+    cmd_args: list[str] = []
+
+    if force:
+        cmd_args.append("--force")
+    if upload_pack:
+        cmd_args.append(f"--upload-pack={upload_pack}")
+
+    # any remaining positional refs (e.g. <remote> <refspec>…)
+    cmd_args.extend(refs)
+
+    run_cmd("fetch", *cmd_args)
+
+
 if __name__ == '__main__':
     cli()

@@ -2,9 +2,11 @@ from legit.cmd_base import Base
 from legit.remotes import Remotes, Refspec
 from legit.rev_list import RevList
 from legit.pack import SIGNATURE
+from legit.remote_client import RemoteClientMixin
+from legit.recv_objects import RecvObjectsMixin
+from legit.fast_forward import FastForwardMixin
 
-
-class Fetch(Base):
+class Fetch(RemoteClientMixin, RecvObjectsMixin, FastForwardMixin, Base):
     UPLOAD_PACK = "git-upload-pack"
 
     def define_options(self) -> None:
@@ -47,7 +49,7 @@ class Fetch(Base):
         else:
             self.fetch_url = self.args[0]
 
-        self.uploader = self.options["uploader"] || remote.uploader if remote is not None else None || Fetch.UPLOAD_PACK
+        self.uploader = self.options["uploader"] or (remote.uploader if remote is not None else None) or Fetch.UPLOAD_PACK
         self.fetch_specs = self.args[1:] if len(self.args) > 1 else remote.fetch_specs if remote is not None else None
 
     def send_want_list(self):

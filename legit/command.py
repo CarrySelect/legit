@@ -21,6 +21,7 @@ from legit.cmd_cherry_pick import CherryPick
 from legit.cmd_revert import Revert
 from legit.cmd_config import Config
 from legit.cmd_remote import Remote
+from legit.cmd_fetch import Fetch
 
 
 class Command:
@@ -43,6 +44,7 @@ class Command:
         "revert": Revert,
         "config": Config,
         "remote": Remote,
+        "fetch": Fetch,
     }
 
     @staticmethod

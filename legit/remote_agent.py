@@ -2,7 +2,8 @@ from legit.protocol import Remotes
 from legit.repository import Repository
 from functools import cache
 
-class RemoteAgent:
+
+class RemoteAgentMixin:
     ZERO_OID = "0" * 40
 
     def accept_client(self, name, capabilities=[]):

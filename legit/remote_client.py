@@ -3,7 +3,7 @@ import subprocess
 from legit.protocol import Remotes
 
 
-class RemoteClient:
+class RemoteClientMixin:
     REF_LINE = re.compile(r"^([0-9a-f]+) (.*)$")
     ZERO_OID = "0" * 40
 
@@ -11,9 +11,9 @@ class RemoteClient:
         self.remote_refs = {}
 
         for line in self.conn.recv_until(None):
-            oid, ref = RemoteClient.REF_LINE.match(line).groups()
+            oid, ref = RemoteClientMixin.REF_LINE.match(line).groups()
             
-            if oid != RemoteClient.ZERO_OID:
+            if oid != RemoteClientMixin.ZERO_OID:
                 self.remote_refs[ref] = oid.lower()
 
     def start_agent(self, name, program, url, capabilities=[]):
@@ -21,7 +21,7 @@ class RemoteClient:
 
         argv = self.build_agent_command(program, url)
         proc = subprocess.Popen(
-            shlex.join(argv),
+            argv,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
         )
@@ -45,11 +45,11 @@ class RemoteClient:
     def ssh_command(self, uri, argv):
         import shlex
 
-        ssh = ["ssh", uri.host]
+        ssh = ["ssh", uri.hostname]
         if uri.port:
             ssh += ["-p", str(uri.port)],
-        if uri.user:
-            ssh += ["-l", uri.user]
+        if uri.username:
+            ssh += ["-l", uri.username]
         return ssh + [shlex.join(argv)]
 
     def report_ref_update(self, ref_names, error, old_oid=None, new_oid=None, is_ff=False):

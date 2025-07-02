@@ -11,9 +11,6 @@ from legit.cmd_base import Base
 class Add(Base):
     def run(self) -> None:
         try:
-            root_path = Path(self.dir).absolute()
-            self.repo = Repository(root_path / ".git")
-        
             self.repo.index.load_for_update()
 
             for path in self.expanded_paths():

@@ -1,3 +1,4 @@
+from functools import cache
 from pathlib import Path
 from typing import MutableMapping, TextIO
 from legit.cmd_color import Color
@@ -25,7 +26,11 @@ class Base:
         self.status: int | None = None
         self.isatty: bool = stdout.isatty()
         self.pager: Pager | None = None
-        self.repo: Repository = Repository(self.dir / ".git")
+
+    @property
+    @cache
+    def repo(self):
+        return Repository(self.dir / ".git")
 
     def edit_file(self, path: Path):
         editor = Editor.edit(path, self.editor_command())
