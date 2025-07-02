@@ -19,11 +19,58 @@ TYPES: MutableMapping[str, Type[Blob | Commit | Tree]] = {
 }
 
 
+class Raw:
+    def __init__(self, ty, size, data):
+        self.ty = ty
+        self.size = size
+        self.data = data
+
 
 class Database:
+    TYPES = {
+        "blob": Blob,
+        "commit": Commit,
+        "tree": Tree,
+    }
+
     def __init__(self, path: Path) -> None:
         self.path: Path = path
         self.objects: MutableMapping[str, Blob | Commit | Tree] = {}
+
+    def load_raw(self, oid):
+        """
+        Load a raw Git object by its oid, returning a Raw(type, size, data) instance.
+        """
+        ty, size, rest = self.read_object_header(oid)
+        return Raw(ty, size, rest)
+    
+    
+    def read_object_header(self, oid, read_bytes=None):
+        """
+        Read the Git object header for oid. Optionally read only the first read_bytes from file.
+        Returns (type, size, remainder_bytes).
+        """
+        path = self.path / str(oid[:2]) / str(oid[2:])
+        with open(path, 'rb') as f:
+            raw = f.read(read_bytes) if read_bytes else f.read()
+    
+        data = zlib.decompress(raw)
+        space_idx = data.find(b' ')
+        type_ = data[:space_idx].decode('utf-8')
+        null_idx = data.find(b'\x00', space_idx + 1)
+        size = int(data[space_idx + 1:null_idx].decode('utf-8'))
+        rest = data[null_idx + 1:]
+    
+        return type_, size, rest
+    
+    def read_object(self, oid):
+        """
+        Read and parse a Git object by oid, returning the parsed object with its oid set.
+        """
+        type_, _, rest = self.read_object_header(oid)
+        obj = TYPES[type_].parse(rest)
+        obj.oid = oid
+        return obj
 
     def tree_entry(self, oid: str) -> DatabaseEntry:
         return DatabaseEntry(oid, 0o40000)
@@ -115,25 +162,6 @@ class Database:
         file.close()
 
         temp_path.rename(object_path)
-
-    def read_object(self, oid: str) -> Blob | Commit | Tree:
-        object_path = self.path / str(oid[:2]) / str(oid[2:])
-        with open(object_path, 'rb') as f:
-            bindata = f.read()
-
-        data = zlib.decompress(bindata)
-
-        space_idx = data.index(b" ")
-        nul_idx   = data.index(b"\x00", space_idx)
-
-        obj_type = data[:space_idx].decode()
-        size     = int(data[space_idx + 1:nul_idx])
-        payload  = data[nul_idx + 1:] 
-    
-        obj = TYPES[obj_type].parse(payload)
-        obj.oid = oid
-
-        return obj
 
     def prefix_match(self, name: str) -> list[str]:
         object_path = self.path / str(name[:2]) / str(name[2:])
