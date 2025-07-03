@@ -362,5 +362,37 @@ def fetch(force: bool, upload_pack: str | None, refs: tuple[str, ...]) -> None:
     run_cmd("fetch", *cmd_args)
 
 
+@cli.command()
+@click.option(
+    '-f', '--force',
+    'force',
+    is_flag=True,
+    help='Force updates (pass -f to push).'
+)
+@click.option(
+    '--receive-pack',
+    'receive_pack',
+    metavar='<path>',
+    help='Path to the remote receive-pack program.'
+)
+@click.argument('refs', nargs=-1, metavar='REF')
+def push(force: bool, receive_pack: str | None, refs: tuple[str, ...]) -> None:
+    """
+    Update remote refs along with associated objects.
+    """
+    cmd_args: list[str] = []
+
+    # translate our click flags into legit’s push flags
+    if force:
+        cmd_args.append('-f')
+    if receive_pack:
+        cmd_args.append(f'--receive-pack={receive_pack}')
+
+    # any remaining positional refs (e.g. <remote> <refspec>…)
+    cmd_args.extend(refs)
+
+    run_cmd('push', *cmd_args)
+
+
 if __name__ == '__main__':
     cli()

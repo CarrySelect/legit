@@ -2,6 +2,7 @@ from pathlib import Path
 from legit.cmd_base import Base
 from typing import MutableMapping, TextIO
 from legit.refs import Refs
+from legit.config import ConfigFile
 
 
 DEFAULT_BRANCH = "master"
@@ -24,8 +25,14 @@ class Init(Base):
             root_path = Path(self.args[0]).absolute().resolve()
         else:
             root_path = Path(self.dir).absolute().resolve()
-            
+        
+
         git_path: Path = root_path / ".git"
+        
+        config = ConfigFile(git_path / "config")
+        config.open_for_update()
+        config.set(["core", "bare"], False)
+        config.save()
 
         for d in ("objects", "refs/heads"):
             try:

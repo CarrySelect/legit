@@ -2,7 +2,7 @@ import io
 import zlib
 import struct
 
-from legit.pack import InvalidPack, HEADER_SIZE, HEADER_FORMAT, SIGNATURE, VERSION, TYPE_CODES, COMMIT, BLOB, TREE, Record
+from legit.pack import InvalidPack, HEADER_SIZE, HEADER_FORMAT, SIGNATURE, VERSION, TYPE_CODES, COMMIT, BLOB, TREE, Record, RefDelta
 from legit.numbers import VarIntLE
 
 
@@ -36,12 +36,7 @@ class Reader:
             return Record(TYPE_CODES_REVERSED.get(ty), decompressed_data)
 
         elif ty == 7:
-            # Skip the 20-byte base OID
-            self.input.read(20)
-            # Skip the zlib-compressed delta data
-            self.read_zlib_stream()
-            # Return None to indicate the object was skipped
-            return None
+            return self.read_ref_delta()
 
         elif ty == 6:
             # Skip the variable-length offset
@@ -58,8 +53,13 @@ class Reader:
         else:
             raise InvalidPack(f"Unknown pack object type: {ty}")
 
+    def read_ref_delta(self):
+        base_oid = self.input.read(20).hex()
+        delta_data = self.read_zlib_stream()
+        return RefDelta(base_oid, delta_dat)
+    
     def read_record_header(self):
-        byte, size = VarIntLE.read(self.input)
+        byte, size = VarIntLE.read(self.input, 4)
         ty = (byte >> 4) & 0x7
         return ty, size
 

@@ -6,9 +6,6 @@ from legit.revision import Revision
 
 class Branch(Base):
     def run(self) -> None:
-        # Initialize repository
-        self.repo = Repository(self.dir / ".git")
-
         # Parse flags
         self.verbose = any(opt in self.args for opt in ("-v", "--verbose"))
         self.delete = any(opt in self.args for opt in ("-d", "-D"))

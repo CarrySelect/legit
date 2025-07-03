@@ -1,3 +1,6 @@
+MAX_COPY_SIZE = 0xffffff
+MAX_INSERT_SIZE = 0x7f
+
 HEADER_SIZE = 12
 HEADER_FORMAT = ">4sII"
 SIGNATURE = b"PACK"
@@ -6,6 +9,8 @@ VERSION = 2
 COMMIT = 1
 TREE = 2
 BLOB = 3
+
+REF_DELTA = 7
 
 TYPE_CODES = {
     "commit": COMMIT,
@@ -30,3 +35,9 @@ class Record:
 
     def type(self):
         return self.ty
+
+
+class RefDelta:
+    def __init__(self, base_oid, delta_data):
+        self.base_oid = base_oid
+        self.delta_data = delta_data

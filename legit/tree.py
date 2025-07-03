@@ -3,6 +3,14 @@ from typing import Any, Callable, MutableMapping
 from pathlib import Path
 
 
+def git_sort_key(item):
+    name, entry = item
+    if isinstance(entry, Tree):
+        return name + "/"
+    return name
+
+
+
 class DatabaseEntry:
     TREE_MODE = 0o40000
 
@@ -85,7 +93,7 @@ class Tree:
 
     def to_bytes(self) -> bytes:
         parts = []
-        for name, entry in sorted(self.entries.items()):
+        for name, entry in sorted(self.entries.items(), key=git_sort_key):
             if isinstance(entry, Tree):
                 mode_str = '40000'
                 assert entry.oid is not None

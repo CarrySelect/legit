@@ -22,6 +22,7 @@ from legit.cmd_revert import Revert
 from legit.cmd_config import Config
 from legit.cmd_remote import Remote
 from legit.cmd_fetch import Fetch
+from legit.cmd_push import Push
 
 
 class Command:
@@ -45,6 +46,7 @@ class Command:
         "config": Config,
         "remote": Remote,
         "fetch": Fetch,
+        "push": Push,
     }
 
     @staticmethod

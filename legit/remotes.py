@@ -1,7 +1,10 @@
+from os import name
 import re
 from pathlib import Path
+from typing import Optional
 from legit.config import ConfigFile
 from legit.refs import Refs
+from legit.revision import Revision
 
 
 class Remotes:
@@ -54,7 +57,7 @@ class Remotes:
 
 
 class Refspec:
-    REFSPEC_FORMAT = re.compile(r"^(\+?)([^:]+):([^:]+)$")
+    REFSPEC_FORMAT = re.compile(r"^(\+?)([^:]*)(:([^:]*))?$")
 
     def __init__(self, source: Path, target: Path, forced: bool) -> None:
         self.source: Path = source
@@ -64,7 +67,28 @@ class Refspec:
     @staticmethod
     def parse(spec: str) -> 'Refspec':
         m = Refspec.REFSPEC_FORMAT.match(spec)
-        return Refspec(m.group(2), m.group(3), m.group(1) == "+")
+        source = Refspec.canonical(m.group(2))
+        target = Refspec.canonical(m.group(4)) or source
+        return Refspec(source, target, m.group(1) == "+")
+
+    @staticmethod
+    def canonical(name: str) -> Optional[Path]:
+        if not name:
+            return None
+
+        if not Revision.valid_ref(name):
+            return Path(name)
+        
+        first = Path(name).parts[0]
+        dirs = [Refs.REFS_DIR, Refs.HEADS_DIR, Refs.REMOTES_DIR]
+
+        matching_dirs = [d for d in dirs if d.name == first]
+
+        if not matching_dirs:
+            return Refs.HEADS_DIR / name
+        else:
+            prefix = matching_dirs[0]
+            return (prefix.parent if prefix else Refs.HEADS_DIR) / name
 
     @staticmethod
     def expand(specs, refs):
@@ -107,6 +131,14 @@ class Remote:
         self.name: str = name
 
         self.config.open()
+
+    @property
+    def push_specs(self):
+        return self.config.get_all(["remote", self.name, "push"])
+
+    @property
+    def receiver(self):
+        return self.config.get_all(["remote", self.name, "receivepack"])
 
     @property
     def fetch_url(self):

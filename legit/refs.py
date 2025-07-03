@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 from sys import path_hooks
-from typing import Any, Optional
+from typing import Any, Optional, Callable
 from legit.lockfile import Lockfile
 from collections import defaultdict
 
@@ -193,17 +193,64 @@ class Refs:
     
         return self._update_ref_file(path, start_oid)
 
-    def _update_ref_file(self, path: Path, oid: str) -> str:
-        lockfile = Lockfile(path)
-        
-        try:
-            lockfile.hold_for_update()
-            self.write_lockfile(lockfile, oid)
-        except FileNotFoundError:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            return self._update_ref_file(path, oid)
+    class StaleValue(Exception):
+        """Raised when the ref has changed since last read."""
+        pass
+   
+    def compare_and_swap(
+        self,
+        name: str,
+        old_oid: Optional[str],
+        new_oid: Optional[str],
+    ) -> None:
+        path = self.path / name
 
-        return oid
+        def guard() -> None:
+            # exactly your Ruby “unless old_oid == read_symref(path)...”
+            if old_oid != self.read_symref(path):
+                raise self.StaleValue(f"value of {name} changed since last read")
+
+        # yield to the “block” just like Ruby’s update_ref_file(path, new_oid) { … }
+        self._update_ref_file(path, new_oid, guard)
+
+
+    def _update_ref_file(
+        self,
+        path: Path,
+        oid: Optional[str],
+        callback: Optional[Callable[[], Any]] = None,
+    ) -> None:
+        lockfile = Lockfile(path)
+
+        try:
+            # hold_for_update
+            lockfile.hold_for_update()
+
+            # yield if block_given?
+            if callback:
+                callback()
+
+            if oid is not None:
+                # write the new OID
+                self.write_lockfile(lockfile, oid)
+            else:
+                # delete (rescuing ENOENT)
+                try:
+                    path.unlink()
+                except FileNotFoundError:
+                    pass
+                # rollback the lock
+                lockfile.rollback()
+
+        except Lockfile.MissingParent:
+            # mkdir -p and retry
+            path.parent.mkdir(parents=True, exist_ok=True)
+            return self.update_ref_file(path, oid, callback)
+
+        except Exception:
+            # on *any* other error, rollback and re-raise
+            lockfile.rollback()
+            raise
 
     def read_ref(self, name: str) -> Optional[str]:
         path = self.path_for_name(name)

@@ -26,6 +26,7 @@ class RevList:
         self.objects = options.get("objects", False)
         self.missing = options.get("missing", False)
         self.pending = []
+        self.paths = {}
     
         if options.get("all"):
             self.include_refs(self.repo.refs.list_all_refs())
@@ -135,10 +136,10 @@ class RevList:
             self.mark_edges_uninteresting()
 
         for commit in self.traverse_commits():
-            yield commit
+            yield commit, None
         
         for obj in self.traverse_pending():
-            yield obj
+            yield obj, self.paths.get(obj.oid)
 
     def mark_edges_uninteresting(self):
         for commit in self.queue:
@@ -152,29 +153,27 @@ class RevList:
                 parent = self.load_commit(oid)
                 self.mark_tree_uninteresting(parent.tree)
 
-    def traverse_tree(self, entry, visitor):
+    def traverse_tree(self, entry, visitor, path: Path = Path()):
+        if entry.oid not in self.paths:
+            self.paths[entry.oid] = path
+
         if not visitor(entry):
             return False
 
-        if not entry.tree:
+        if not entry.is_tree():
             return False
 
         tree = self.repo.database.load(entry.oid)
         for name, item in tree.entries.items():
-            self.traverse_tree(item, visitor)
+            self.traverse_tree(item, visitor, path / name)
 
         return True
 
-    def mark_tree_uninteresting(self):
-        for commit in self.queue:
-            if self.is_marked(commit.oid, 'uninteresting'):
-                self.mark_tree_uninteresting(commit.tree)
-
-            for parent_oid in commit.parents:
-                if not self.is_marked(parent_oid, 'uninteresting'):
-                    continue
-                parent = self.load_commit(parent_oid)
-                self.mark_tree_uninteresting(parent.tree)
+    def mark_tree_uninteresting(self, tree_oid):
+        entry = self.repo.database.tree_entry(tree_oid)
+        def _mark(o):
+            self.mark(o.oid, "uninteresting")
+        self.traverse_tree(entry, _mark)
 
     def traverse_pending(self) -> Generator:
         """
@@ -196,7 +195,7 @@ class RevList:
         if not self.mark(entry.oid, 'seen'):
             return
         yield entry
-        if entry.tree:
+        if entry.is_tree():
             tree = self.repo.database.load(entry.oid)
             for name, item in tree.entries.items():
                 yield from self._traverse_objects(item) 

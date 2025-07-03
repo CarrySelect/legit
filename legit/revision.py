@@ -1,8 +1,14 @@
 import re
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, TYPE_CHECKING
 from legit.blob import Blob
 from legit.commit import Commit
-from legit.repository import Repository
+
+if TYPE_CHECKING:
+    from legit.repository import Repository
+else:
+    Repository = None
+
+
 from legit.tree import Tree
 
 
@@ -105,8 +111,6 @@ class Revision:
         if oid is not None:
             return oid
 
-        print(f"oid is: {oid}")
-        
         raise Revision.InvalidObject(f"Not a valid object name: '{self.expr}'.")
 
     @classmethod

@@ -11,7 +11,6 @@ class RemoteClientMixin:
         self.remote_refs = {}
 
         for line in self.conn.recv_until(None):
-            print(line)
             m = self.REF_LINE.match(line)
             if not m:
                 continue
@@ -40,7 +39,7 @@ class RemoteClientMixin:
         from urllib.parse import urlparse
         
         uri = urlparse(url)
-        argv = shlex.split(program) + [uri.path]
+        argv = shlex.split(program) + [uri.path.lstrip('/')]
         if uri.scheme == "file":
             return argv
         elif uri.scheme == "ssh":
@@ -51,8 +50,7 @@ class RemoteClientMixin:
         if uri.username:
             ssh += ["-l", uri.username]
         if uri.port:
-            ssh += ["-p", str(uri.port)],
-        print(ssh + argv)
+            ssh += ["-p", str(uri.port)]
         return ssh + argv 
 
     def report_ref_update(self, ref_names, error, old_oid=None, new_oid=None, is_ff=False):
@@ -78,7 +76,7 @@ class RemoteClientMixin:
             self.show_ref_update(" ", revisions, ref_names)
         else:
             revisions = f"{old_oid}...{new_oid}"
-            self.show_ref_update("+", revisions, ref_names, forced_update)
+            self.show_ref_update("+", revisions, ref_names, "forced update")
 
     def show_ref_update(self, flag, summary, ref_names, reason=None):
         names = [self.repo.refs.short_name(name) for name in ref_names]

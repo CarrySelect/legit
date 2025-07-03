@@ -40,6 +40,6 @@ class RemoteAgentMixin:
             sent = True
 
         if not sent:
-            self.conn.send_packet(f"{RemoteAgent.ZERO_OID} capabilities^{}")
+            self.conn.send_packet(f"{self.ZERO_OID} capabilities^{{}}")
 
         self.conn.send_packet(None)

@@ -66,7 +66,6 @@ class Log(PrintDiffMixin, Base):
         """
         Executes the log command, parsing options and displaying commit history.
         """
-        self.repo: Repository = Repository(self.dir / ".git")
         self.define_options()
         self.blank_line: bool = False
         

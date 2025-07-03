@@ -37,7 +37,7 @@ class Remotes:
             try:
                 head_str = head_bytes.decode('ascii')
             except UnicodeDecodeError:
-                return head_bytes
+                return None if not head_bytes else head_bytes
 
             if not re.match(r'^[0-9a-f]{4}$', head_str, re.IGNORECASE):
                 return head_bytes

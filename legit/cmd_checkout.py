@@ -24,8 +24,6 @@ DETACHED_HEAD_MESSAGE = textwrap.dedent("""\
 
 class Checkout(Base):
     def run(self) -> None:
-        self.repo: Repository = Repository(self.dir / ".git")
-        
         self.target: str = self.args[0]
 
         self.current_ref: Refs.SymRef = self.repo.refs.current_ref()
