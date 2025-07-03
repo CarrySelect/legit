@@ -35,7 +35,7 @@ class UploadPack(RemoteAgentMixin, SendObjectsMixin, Base):
         self.conn.send_packet("NAK")
 
     def send_objects(self):
-        revs = self.wanted | set(f"^{oid}" for oid in self.remote_has)
+        revs = list(self.wanted) + [f"^{oid}" for oid in self.remote_has]
         self.send_packet_objects(revs)
 
 

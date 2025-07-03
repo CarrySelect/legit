@@ -16,20 +16,14 @@ class VarIntLE:
 
     @staticmethod
     def read(stream) -> tuple[int, int]:
-        first_b = stream.read(1)
-        if not first_b:
-            raise EOFError("Unexpected EOF while reading VarIntLE")
-        first = first_b[0]
+        first = stream.readbyte()
 
         value = first & 0xF
         shift = 4
         byte = first
-
-        while byte & 0x80:
-            nxt_b = stream.read(1)
-            if not nxt_b:
-                raise EOFError("Unexpected EOF while reading VarIntLE")
-            byte = nxt_b[0]
+        
+        while byte >= 0x80:
+            byte = stream.readbyte()
             value |= (byte & 0x7F) << shift
             shift += 7
 

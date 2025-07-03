@@ -11,23 +11,27 @@ class RemoteClientMixin:
         self.remote_refs = {}
 
         for line in self.conn.recv_until(None):
-            oid, ref = RemoteClientMixin.REF_LINE.match(line).groups()
+            print(line)
+            m = self.REF_LINE.match(line)
+            if not m:
+                continue
+
+            oid, ref = m.groups()
             
             if oid != RemoteClientMixin.ZERO_OID:
                 self.remote_refs[ref] = oid.lower()
 
     def start_agent(self, name, program, url, capabilities=[]):
-        import shlex
-
         argv = self.build_agent_command(program, url)
         proc = subprocess.Popen(
             argv,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
+            stderr=self.stderr,
         )
 
-        input_stream  = proc.stdin
-        output_stream = proc.stdout
+        input_stream  = proc.stdout
+        output_stream = proc.stdin
 
         self.conn = Remotes.Protocol(name, input_stream, output_stream, capabilities)
 
@@ -43,14 +47,13 @@ class RemoteClientMixin:
             return self.ssh_command(uri, argv)
     
     def ssh_command(self, uri, argv):
-        import shlex
-
         ssh = ["ssh", uri.hostname]
-        if uri.port:
-            ssh += ["-p", str(uri.port)],
         if uri.username:
             ssh += ["-l", uri.username]
-        return ssh + [shlex.join(argv)]
+        if uri.port:
+            ssh += ["-p", str(uri.port)],
+        print(ssh + argv)
+        return ssh + argv 
 
     def report_ref_update(self, ref_names, error, old_oid=None, new_oid=None, is_ff=False):
         if error:

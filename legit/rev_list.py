@@ -88,16 +88,16 @@ class RevList:
 
         try:    
             oid = Revision(self.repo, rev).resolve(Revision.COMMIT)
+            commit = self.load_commit(oid)
+            self.enqueue_commit(commit)
+
+            if not interesting:
+                self.limited = True
+                self.mark(oid, "uninteresting")
+                self.mark_parents_uninteresting(commit)
         except Revision.InvalidObject as e:
             if not self.missing:
                 raise e
-        commit = self.load_commit(oid)
-        self.enqueue_commit(commit)
-
-        if not interesting:
-            self.limited = True
-            self.mark(oid, "uninteresting")
-            self.mark_parents_uninteresting(commit)
 
     def mark_parents_uninteresting(self, commit):
         queue: list[str] = list(commit.parents)

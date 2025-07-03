@@ -28,9 +28,35 @@ class Reader:
         if version != VERSION:
             raise InvalidPack(f"unsupported pack version: {version}")
 
-    def read_record(self) -> Record:
+    def read_record(self) -> 'Record | None':
         ty, _ = self.read_record_header()
-        return Record(TYPE_CODES_REVERSED[ty], self.read_zlib_stream())
+
+        if ty in [COMMIT, BLOB, TREE]:
+            decompressed_data = self.read_zlib_stream()
+            return Record(TYPE_CODES_REVERSED.get(ty), decompressed_data)
+
+        elif ty == 7:
+            # Skip the 20-byte base OID
+            self.input.read(20)
+            # Skip the zlib-compressed delta data
+            self.read_zlib_stream()
+            # Return None to indicate the object was skipped
+            return None
+
+        elif ty == 6:
+            # Skip the variable-length offset
+            byte = self.input.readbyte()
+            while byte & 0x80:
+                byte = self.input.readbyte()
+            
+            # Skip the zlib-compressed delta data
+            self.read_zlib_stream() 
+            
+            # Return None to indicate the object was skipped
+            return None
+
+        else:
+            raise InvalidPack(f"Unknown pack object type: {ty}")
 
     def read_record_header(self):
         byte, size = VarIntLE.read(self.input)
@@ -40,20 +66,24 @@ class Reader:
     def read_zlib_stream(self) -> bytes:
         decompressor = zlib.decompressobj()
         output = bytearray()
-    
-        while True:
+
+        while not decompressor.eof:
             chunk = self.input.read_nonblock(256)
-            if not chunk:
-                raise InvalidPack("Unexpected EOF in zlib stream")
+            if not chunk and not decompressor.eof:
+                raise InvalidPack("Input stream ended unexpectedly during zlib decompression")
             
-            output.extend(decompressor.decompress(chunk))
-    
-            if decompressor.eof:
-                leftover = decompressor.unused_data
-                if leftover:
-                    self.input.seek(-len(leftover), io.SEEK_CUR)
-                break
-    
+            try:
+                output.extend(decompressor.decompress(chunk))
+            except zlib.error as e:
+                raise InvalidPack(f"Zlib decompression error: {e}") from e
+
+        # After the loop, decompressor.unused_data holds the over-read bytes.
+        # We use our custom Stream's seek method to "un-read" this data by
+        # prepending it to the internal buffer for the next read operation.
+        if decompressor.unused_data:
+            # A negative seek on our Stream wrapper moves data back to the buffer.
+            self.input.seek(-len(decompressor.unused_data))
+
         return bytes(output)
 
 

@@ -10,7 +10,9 @@ class RecvObjectsMixin:
         reader.read_header()
 
         for n in range(reader.count):
-            record, _ = stream.capture(lambda reader: reader.read_record())
-            self.repo.database.store(record)
+            with stream.capture():
+                record = reader.read_record()
+            if record is not None:
+                self.repo.database.store(record)
 
         stream.verify_checksum()

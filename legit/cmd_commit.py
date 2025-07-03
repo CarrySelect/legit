@@ -48,7 +48,6 @@ class Commit(WriteCommitMixin, Base):
     def run(self) -> None:
         self.define_options()    
 
-        self.repo = Repository(self.dir / ".git")
         self.repo.index.load()
     
         if self.amend:

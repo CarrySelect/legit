@@ -6,6 +6,7 @@ from legit.remote_client import RemoteClientMixin
 from legit.recv_objects import RecvObjectsMixin
 from legit.fast_forward import FastForwardMixin
 
+
 class Fetch(RemoteClientMixin, RecvObjectsMixin, FastForwardMixin, Base):
     UPLOAD_PACK = "git-upload-pack"
 
@@ -105,6 +106,9 @@ class Fetch(RemoteClientMixin, RecvObjectsMixin, FastForwardMixin, Base):
         new_oid = self.remote_refs[source]
         ref_names = (source, target)
         ff_error = self.fast_forward_error(old_oid, new_oid)
+        
+        # FIXME
+        error = None
 
         if self.options["force"] or forced or ff_error is None:
             self.repo.refs.update_ref(target, new_oid)

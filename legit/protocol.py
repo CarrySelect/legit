@@ -17,34 +17,42 @@ class Remotes:
 
         def send_packet(self, line):
             if line is None:
-                return self.output.write("0000")
+                return self.output.write(b"0000")
 
             line = self.append_caps(line)
             
             size = len(line.encode('utf-8')) + 5
             header = f"{size:04x}"
 
-            self.output.write(header)
-            self.output.write(line)
-            self.output.write("\n")
+            self.output.write(header.encode())
+            self.output.write(line.encode())
+            self.output.write(b"\n")
             self.output.flush()
 
         def recv_packet(self):
-            head = self.input.read(4)
-            if not head or not all(c in '0123456789abcdef' for c in head):
-                return head
+            import re
 
-            size = int(head, 16)
+            head_bytes = self.input.read(4)
+
+            try:
+                head_str = head_bytes.decode('ascii')
+            except UnicodeDecodeError:
+                return head_bytes
+
+            if not re.match(r'^[0-9a-f]{4}$', head_str, re.IGNORECASE):
+                return head_bytes
+
+            size = int(head_str, 16)
             if size == 0:
                 return None
 
-            # Read the rest of the packet
             body = self.input.read(size - 4)
-            # Strip the trailing newline
-            if body.endswith("\n"):
+            if body.endswith(b"\n"):
                 body = body[:-1]
 
-            return self.detect_caps(body)
+            body_str = body.decode('utf-8', errors='replace')
+
+            return self.detect_caps(body_str)
 
         def recv_until(self, terminator):
             """
@@ -57,7 +65,7 @@ class Remotes:
                 yield line
 
         def append_caps(self, line):
-            if self._caps_sent:
+            if self.caps_sent:
                 return line
 
             self.caps_sent = True
@@ -73,7 +81,7 @@ class Remotes:
         def detect_caps(self, line):
             if self.caps_remote is not None:
                 return line
-
+            
             if self.command == "upload-pack":
                 sep = " "
                 parts_count = 3
@@ -82,7 +90,7 @@ class Remotes:
                 parts_count = 2
 
             parts = line.split(sep, parts_count)
-            if len(parts) == parts_count + 1:
+            if len(parts) == parts_count:
                 *main_parts, caps = parts
             else:
                 main_parts = parts
