@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "legit"
 version = "0.1.0"
-description = "A tiny git-like VCS clone."
+description = "A small git(1) implementation."
 readme = "README.md"
 authors = [{ name = "Nemanja Petrović", email = "git@cvt.sd2.si" }]
 license = { text = "MIT" }
