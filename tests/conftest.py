@@ -56,6 +56,11 @@ class Commit(Protocol):
     ) -> LegitCmdResult: ...
 
 
+@pytest.fixture(autouse=True)
+def default_editor(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(Editor, "DEFAULT_EDITOR", "true")
+
+
 @pytest.fixture
 def load_commit(repo: Repository, resolve_revision: ResolveRevision) -> LoadCommit:
     def _load_commit(expression: str) -> Blob | CommitObj | Tree | Record:
@@ -78,7 +83,7 @@ def repo_path(tmp_path: Path) -> Path:
 
 
 @pytest.fixture(autouse=True)
-def setup_and_teardown(repo_path: Path) -> Generator[None]:
+def setup_and_teardown(repo_path: Path) -> Generator[None, None, None]:
     Command.execute(
         repo_path, {}, ["legit", "init"], StringIO(), StringIO(), StringIO()
     )
@@ -87,7 +92,7 @@ def setup_and_teardown(repo_path: Path) -> Generator[None]:
 
 
 @pytest.fixture
-def repo(repo_path: Path) -> Generator[Repository]:
+def repo(repo_path: Path) -> Generator[Repository, None, None]:
     git_dir = repo_path / ".git"
     repo_instance = Repository(git_dir)
     try:
@@ -178,7 +183,7 @@ def make_unreadable(repo_path: Path) -> MakeUnreadable:
 
 
 @pytest.fixture
-def legit_cmd(repo_path: Path) -> Generator[LegitCmd]:
+def legit_cmd(repo_path: Path) -> Generator[LegitCmd, None, None]:
     to_close = []
 
     def _legit_cmd(

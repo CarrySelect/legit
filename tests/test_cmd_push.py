@@ -24,7 +24,7 @@ WriteCommit: TypeAlias = Callable[[str], None]
 
 
 @pytest.fixture
-def create_remote_repo(repo_path: Path) -> Generator[CreateRemoteRepo]:
+def create_remote_repo(repo_path: Path) -> Generator[CreateRemoteRepo, None, None]:
     created_remote_paths = []
 
     def _create_remote_repo(name: str) -> RemoteRepo:

@@ -47,15 +47,24 @@ def init(path: Path | None) -> None:
     run_cmd("init", *(str(path),) if path is not None else ())
 
 
-@cli.command(context_settings={"ignore_unknown_options": True})
+@cli.command()
 @click.argument("paths", nargs=-1, type=click.Path(path_type=Path))
-def add(paths: tuple[Path, ...]) -> None:
+@click.option("-n", "--dry-run", is_flag=True)
+def add(paths: tuple[Path, ...], dry_run: bool) -> None:
     """Add file contents to the index."""
     if not paths:
         click.echo("error: pathspec required", err=True)
         raise SystemExit(1)
 
-    run_cmd("add", *(str(p) for p in paths))
+    cmd_args: list[str] = ["add"]
+
+    if dry_run:
+        cmd_args.append("--dry-run")
+
+    for path in paths:
+        cmd_args.extend([str(path)])
+
+    run_cmd(*cmd_args)
 
 
 @cli.command()

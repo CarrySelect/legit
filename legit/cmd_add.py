@@ -5,12 +5,31 @@ from pathlib import Path
 from legit.blob import Blob
 from legit.cmd_base import Base
 from legit.lockfile import Lockfile
+from legit.inspector import Inspector
 from legit.workspace import Workspace
 
 
 class Add(Base):
+    def define_options(self) -> None:
+        self.dry_run = False
+
+        if "--dry-run" in self.args or "-n" in self.args:
+            self.dry_run = True
+            self.args = [arg for arg in self.args if arg not in ("--dry-run", "-n")]
+
     def run(self) -> None:
+        self.define_options()
+
         try:
+            if self.dry_run:
+                self.repo.index.load()
+
+                for path in self.expanded_paths():
+                    if self.would_change_index(path):
+                        self.println(f"add '{path}'")
+
+                return
+
             self.repo.index.load_for_update()
 
             for path in self.expanded_paths():
@@ -24,6 +43,16 @@ class Add(Base):
         except Workspace.NoPermission as e:
             self.handle_no_permission(e)
 
+    def would_change_index(self, path: Path) -> bool:
+        stat = self.repo.workspace.stat_file(path)
+        assert stat is not None
+
+        entry = self.repo.index.entry_for_path(path)
+
+        inspector = Inspector(self.repo)
+
+        return inspector.compare_index_to_workspace(entry, stat) is not None
+
     def handle_locked_index(self, exc: Exception) -> None:
         self.stderr.write(f"fatal: {exc}\n\n")
         self.stderr.write(
@@ -36,14 +65,18 @@ class Add(Base):
 
     def handle_missing_file(self, exc: Exception) -> None:
         self.stderr.write(f"fatal: {exc}\n")
-        self.repo.index.release_lock()
+        self.release_index_lock()
         self.exit(128)
 
     def handle_no_permission(self, exc: Exception) -> None:
         self.stderr.write(f"error: {exc}\n")
         self.stderr.write("fatal: adding files failed\n")
-        self.repo.index.release_lock()
+        self.release_index_lock()
         self.exit(128)
+
+    def release_index_lock(self) -> None:
+        if self.repo.index.lockfile.lock is not None:
+            self.repo.index.release_lock()
 
     def expanded_paths(self) -> list[Path]:
         paths = []

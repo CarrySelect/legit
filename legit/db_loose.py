@@ -54,7 +54,7 @@ class Loose:
         oids = []
 
         try:
-            files = dirname.iterdir()
+            files = list(dirname.iterdir())
         except FileNotFoundError:
             return []
 

@@ -1,5 +1,5 @@
 from legit.repository import Repository
-from tests.cmd_helpers import assert_stderr, assert_stdout
+from tests.cmd_helpers import assert_index, assert_stderr, assert_stdout
 from tests.conftest import (
     LegitCmd,
     MakeExecutable,
@@ -88,6 +88,26 @@ def test_it_is_silent_on_success(write_file: WriteFile, legit_cmd: LegitCmd) -> 
     assert cmd.status == 0
     assert_stdout(stdout, "")
     assert_stderr(stderr, "")
+
+
+def test_dry_run_with_repository_root_only_lists_files_that_would_change_index(
+    write_file: WriteFile, legit_cmd: LegitCmd, repo: Repository
+) -> None:
+    write_file("changed.txt", "old")
+    write_file("unchanged.txt", "same")
+    _ = legit_cmd("add", ".")
+
+    write_file("changed.txt", "new")
+    write_file("new.txt", "new")
+
+    cmd, _, stdout, stderr = legit_cmd("add", ".", "--dry-run")
+
+    assert cmd.status == 0
+    stdout.seek(0)
+    assert set(stdout.read().splitlines()) == {"add 'changed.txt'", "add 'new.txt'"}
+    assert_stderr(stderr, "")
+    assert not (repo.git_path / "index.lock").exists()
+    assert_index(repo, {"changed.txt": "old", "unchanged.txt": "same"})
 
 
 def test_it_fails_for_nonexistent_files(legit_cmd: LegitCmd, repo: Repository) -> None:
